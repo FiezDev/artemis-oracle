@@ -1,0 +1,39 @@
+{
+  "eval_id": 2,
+  "eval_name": "react-debugging",
+  "prompt": "I need a prompt for debugging React performance issues in my component",
+  "assertions": [
+    {
+      "name": "walks_all_steps",
+      "description": "Should guide user through all 6 steps of the COSTAR framework"
+    },
+    {
+      "name": "produces_mega_prompt",
+      "description": "Should compile answers into a structured Mega-Prompt"
+    },
+    {
+      "name": "uses_delimiters",
+      "description": "Should use XML tags like <code>, <input>, <existing_context>"
+    },
+    {
+      "name": "includes_persona",
+      "description": "Should include Role/Persona section with expertise level"
+    },
+    {
+      "name": "includes_context_section",
+      "description": "Should include Context section with code/background"
+    },
+    {
+      "name": "includes_examples_section",
+      "description": "Should include Examples section with Input/Output pairs"
+    },
+    {
+      "name": "includes_output_format",
+      "description": "Should include Output Format specification"
+    },
+    {
+      "name": "includes_constraints",
+      "description": "Should include Constraints/Guardrails section with positive framing"
+    }
+  ]
+}

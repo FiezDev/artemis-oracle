@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "refine-dev", "runs": [{"id": "python-unit-tests-with_skill", "prompt": "Help me create a prompt for generating Python unit tests with pytest", "eval_id": 1, "outputs": [{"name": "mega_prompt.md", "type": "text", "content": "# Mega-Prompt: Python Unit Test Generator\n\n---\n\n# Role\nYou are a Senior Python Engineer specializing in test-driven development, with deep expertise in pytest, test coverage optimization, and edge case identification. Your focus is on writing comprehensive, maintainable unit tests that achieve high branch coverage.\n\n# Objective\nGenerate comprehensive unit tests for Python functions. Analyze the provided function to identify all branches, edge cases, and error conditions, then produce a complete pytest test file that validates each code path.\n\n# Context\n\n<project_context>\nFlask REST API with SQLAlchemy models. Tests use pytest with fixtures for database setup and teardown. The codebase follows PEP 8 style guidelines and emphasizes descriptive test naming conventions.\n</project_context>\n\n<example_function>\n```python\ndef calculate_discount(price, customer_tier, is_member):\n    if customer_tier not in ['bronze', 'silver', 'gold']:\n        raise ValueError('Invalid tier')\n    multipliers = {'bronze': 0.95, 'silver': 0.90, 'gold': 0.85}\n    discount = price * multipliers[customer_tier]\n    if is_member:\n        discount *= 0.95\n    return round(discount, 2)\n```\n</example_function>\n\n# Examples\n\n## Example 1\n\nInput:\n<example_input>\nFunction signature: def calculate_discount(price, customer_tier, is_member)\n</example_input>\n\nOutput:\n<example_output>\n```python\n\"\"\"\nUnit tests for discount calculation module.\nTests cover happy path, edge cases, and error conditions.\n\"\"\"\nimport pytest\nfrom decimal import Decimal\n\n\nclass TestCalculateDiscount:\n    \"\"\"Test suite for calculate_discount function.\"\"\"\n\n    # Happy Path Tests\n    def test_calculate_discount_bronze_non_member(self):\n        \"\"\"Verify bronze tier discount without membership.\"\"\"\n        result = calculate_discount(100.00, 'bronze', False)\n        assert result == 95.00\n\n    def test_calculate_discount_silver_non_member(self):\n        \"\"\"Verify silver tier discount without membership.\"\"\"\n        result = calculate_discount(100.00, 'silver', False)\n        assert result == 90.00\n\n    def test_calculate_discount_gold_non_member(self):\n        \"\"\"Verify gold tier discount without membership.\"\"\"\n        result = calculate_discount(100.00, 'gold', False)\n        assert result == 85.00\n\n    def test_calculate_discount_gold_member(self):\n        \"\"\"Verify gold tier discount with additional membership discount.\"\"\"\n        result = calculate_discount(100.00, 'gold', True)\n        # 100 * 0.85 * 0.95 = 80.75\n        assert result == 80.75\n\n    # Parameterized Tests for Efficiency\n    @pytest.mark.parametrize(\"tier,expected_multiplier\", [\n        ('bronze', 0.95),\n        ('silver', 0.90),\n        ('gold', 0.85),\n    ])\n    def test_calculate_discount_tier_multipliers(self, tier, expected_multiplier):\n        \"\"\"Verify correct multiplier applied for each tier.\"\"\"\n        price = 100.00\n        result = calculate_discount(price, tier, False)\n        assert result == round(price * expected_multiplier, 2)\n\n    # Edge Case Tests\n    def test_calculate_discount_zero_price(self):\n        \"\"\"Verify zero price returns zero discount.\"\"\"\n        result = calculate_discount(0, 'gold', True)\n        assert result == 0.00\n\n    def test_calculate_discount_large_price(self):\n        \"\"\"Verify large prices are handled correctly.\"\"\"\n        result = calculate_discount(1_000_000.00, 'gold', True)\n        assert result == 807500.00\n\n    def test_calculate_discount_decimal_precision(self):\n        \"\"\"Verify rounding to 2 decimal places.\"\"\"\n        result = calculate_discount(99.99, 'bronze', True)\n        # 99.99 * 0.95 * 0.95 = 90.059975 -> rounded to 90.06\n        assert result == 90.06\n\n    # Negative Tests - Error Conditions\n    def test_calculate_discount_invalid_tier_raises_error(self):\n        \"\"\"Verify ValueError raised for invalid tier.\"\"\"\n        with pytest.raises(ValueError, match='Invalid tier'):\n            calculate_discount(100.00, 'platinum', False)\n\n    @pytest.mark.parametrize(\"invalid_tier\", ['PLATINUM', 'Bronze', 'SILVER', '', '   ', 'invalid'])\n    def test_calculate_discount_invalid_tier_variants(self, invalid_tier):\n        \"\"\"Verify ValueError raised for various invalid tier inputs.\"\"\"\n        with pytest.raises(ValueError, match='Invalid tier'):\n            calculate_discount(100.00, invalid_tier, False)\n\n    # Membership Flag Tests\n    @pytest.mark.parametrize(\"tier\", ['bronze', 'silver', 'gold'])\n    def test_calculate_discount_member_receives_additional_discount(self, tier):\n        \"\"\"Verify membership provides additional 5% discount across all tiers.\"\"\"\n        price = 100.00\n        non_member = calculate_discount(price, tier, False)\n        member = calculate_discount(price, tier, True)\n        assert member == round(non_member * 0.95, 2)\n```\n</example_output>\n\n# Output Format\nProduce a complete pytest test file with the following structure:\n\n1. **Module docstring** explaining the test file's purpose\n2. **Imports** - all necessary imports including pytest and the module under test\n3. **Fixtures** (if needed) - pytest fixtures for test setup\n4. **Test class or functions** organized by category:\n   - Happy path tests\n   - Edge case tests\n   - Negative tests (error conditions)\n   - Parameterized tests for efficiency\n\nEach test function must include:\n- A docstring explaining what behavior is being validated\n- Descriptive function name following pattern: `test_<function>_<scenario>`\n- Clear assertions with meaningful failure messages where helpful\n\n# Reasoning\nProvide the output directly. Focus on identifying all branches in the code and ensuring each branch has at least one corresponding test case.\n\n# Constraints\n\n1. Test all branches in the function under test - every conditional path must have coverage\n2. Include negative tests for all invalid input scenarios\n3. Keep tests isolated - no external API calls, database connections, or network requests\n4. Use `@pytest.mark.parametrize` to efficiently test multiple similar scenarios\n5. Handle all edge cases including: zero values, boundary values, empty inputs, None/null values (if applicable)\n6. Use descriptive test names that clearly indicate what is being tested\n7. Follow the existing codebase naming convention: `test_<function>_<scenario>`\n\n# Security Considerations\n- All test inputs should be self-contained within the test file\n- Do not use production data or credentials in tests\n- Mock any external dependencies to maintain test isolation\n"}], "grading": {"expectations": [{"text": "walks_all_steps", "passed": false, "evidence": "Found 0/6 step references"}, {"text": "produces_mega_prompt", "passed": true, "evidence": "Role: True, Objective: True, Context: True"}, {"text": "uses_delimiters", "passed": true, "evidence": "Found 2 delimiter types"}, {"text": "includes_persona", "passed": true, "evidence": "Persona keywords: True, Role section: True"}, {"text": "includes_context_section", "passed": true, "evidence": "Context header: True, Context delimiter: False"}, {"text": "includes_examples_section", "passed": true, "evidence": "Examples header: True, IO format: True"}, {"text": "includes_output_format", "passed": true, "evidence": "Format header: True, Structure mention: False"}, {"text": "includes_constraints", "passed": true, "evidence": "Constraints header: True, Security mention: True"}]}}, {"id": "python-unit-tests-without_skill", "prompt": "Help me create a prompt for generating Python unit tests with pytest", "eval_id": 1, "outputs": [{"name": "response.md", "type": "text", "content": "# Prompt for Generating Python Unit Tests with pytest\n\nHere's a comprehensive prompt you can use to generate high-quality Python unit tests:\n\n---\n\n## Recommended Prompt\n\n```\nGenerate comprehensive pytest unit tests for the following Python code:\n\n[PASTE YOUR CODE HERE]\n\nRequirements for the tests:\n1. Use pytest framework conventions (test_ prefix, assert statements)\n2. Include tests for:\n   - Happy path scenarios (expected behavior)\n   - Edge cases (empty inputs, None values, boundary conditions)\n   - Error handling (invalid inputs, expected exceptions)\n3. Use appropriate pytest features:\n   - @pytest.fixture for setup/teardown when needed\n   - @pytest.mark.parametrize for parameterized tests when testing multiple inputs\n   - @pytest.raises for testing expected exceptions\n4. Follow naming convention: test_<function_name>_<scenario>\n5. Include docstrings explaining what each test validates\n6. Aim for high code coverage but prioritize meaningful tests over coverage percentage\n\nOutput format:\n- Complete, runnable test file\n- Include necessary imports\n- Add comments explaining complex test logic\n```\n\n---\n\n## Alternative: Step-by-Step Prompt\n\nIf you want more control, use this iterative approach:\n\n```\nI have a Python function/module that I need to test with pytest.\n\nHere's the code:\n[PASTE YOUR CODE]\n\nPlease help me write tests by:\n1. First, identify all functions/methods that need testing\n2. List the test scenarios for each (happy path, edge cases, errors)\n3. Generate the complete test file with proper structure\n```\n\n---\n\n## Tips for Better Results\n\n1. **Include context**: Share the full module or function you're testing\n2. **Specify dependencies**: Mention any external services, databases, or APIs that need mocking\n3. **Coverage goals**: Mention if you need 100% coverage or have specific requirements\n4. **Mocking needs**: If your code makes HTTP requests or file operations, mention that mocking is needed\n\n---\n\n## Example Usage\n\n**Input:**\n```python\ndef calculate_discount(price, discount_percent):\n    if discount_percent < 0 or discount_percent > 100:\n        raise ValueError(\"Discount must be between 0 and 100\")\n    return price * (1 - discount_percent / 100)\n```\n\n**Prompt:**\n```\nGenerate pytest unit tests for this function:\n\ndef calculate_discount(price, discount_percent):\n    if discount_percent < 0 or discount_percent > 100:\n        raise ValueError(\"Discount must be between 0 and 100\")\n    return price * (1 - discount_percent / 100)\n\nInclude tests for happy path, edge cases, and error handling.\n```\n\n**Expected Output:**\n```python\nimport pytest\n\ndef test_calculate_discount_happy_path():\n    \"\"\"Test normal discount calculation.\"\"\"\n    assert calculate_discount(100, 20) == 80.0\n    assert calculate_discount(50, 10) == 45.0\n\ndef test_calculate_discount_zero_percent():\n    \"\"\"Test with 0% discount.\"\"\"\n    assert calculate_discount(100, 0) == 100.0\n\ndef test_calculate_discount_hundred_percent():\n    \"\"\"Test with 100% discount.\"\"\"\n    assert calculate_discount(100, 100) == 0.0\n\n@pytest.mark.parametrize(\"price,discount,expected\", [\n    (100, 25, 75.0),\n    (200, 50, 100.0),\n    (99.99, 33.33, 66.6633),\n])\ndef test_calculate_discount_various_inputs(price, discount, expected):\n    \"\"\"Test various input combinations.\"\"\"\n    assert calculate_discount(price, discount) == pytest.approx(expected)\n\ndef test_calculate_discount_negative_percent_raises():\n    \"\"\"Test that negative discount raises ValueError.\"\"\"\n    with pytest.raises(ValueError, match=\"Discount must be between 0 and 100\"):\n        calculate_discount(100, -10)\n\ndef test_calculate_discount_over_hundred_raises():\n    \"\"\"Test that discount over 100 raises ValueError.\"\"\"\n    with pytest.raises(ValueError, match=\"Discount must be between 0 and 100\"):\n        calculate_discount(100, 110)\n```\n\n---\n\n## Quick Reference: Common pytest Patterns\n\n| Pattern | Use Case |\n|---------|----------|\n| `assert x == y` | Basic equality check |\n| `pytest.approx(value)` | Float comparison with tolerance |\n| `@pytest.fixture` | Shared setup/teardown |\n| `@pytest.mark.parametrize` | Data-driven tests |\n| `pytest.raises(Exception)` | Test expected exceptions |\n| `@pytest.mark.skip` | Skip a test temporarily |\n| `monkeypatch.setattr()` | Mock/patch objects |\n\n---\n\nGood luck with your testing!\n"}], "grading": {"expectations": [{"text": "walks_all_steps", "passed": false, "evidence": "Found 0/6 step references"}, {"text": "produces_mega_prompt", "passed": false, "evidence": "Role: False, Objective: False, Context: False"}, {"text": "uses_delimiters", "passed": false, "evidence": "Found 0 delimiter types"}, {"text": "includes_persona", "passed": false, "evidence": "Persona keywords: False, Role section: False"}, {"text": "includes_context_section", "passed": false, "evidence": "Context header: False, Context delimiter: False"}, {"text": "includes_examples_section", "passed": true, "evidence": "Examples header: True, IO format: False"}, {"text": "includes_output_format", "passed": false, "evidence": "Format header: False, Structure mention: False"}, {"text": "includes_constraints", "passed": false, "evidence": "Constraints header: False, Security mention: False"}]}}, {"id": "react-debugging-with_skill", "prompt": "I need a prompt for debugging React performance issues in my component", "eval_id": 2, "outputs": [{"name": "mega_prompt.md", "type": "text", "content": "# Role\n\nYou are a Senior React Performance Engineer specializing in diagnosing and resolving performance bottlenecks in React applications. You have deep expertise in React's rendering behavior, reconciliation algorithm, and optimization techniques.\n\n# Objective\n\nYour task is to analyze React component code, identify performance bottlenecks, and provide optimized solutions with clear explanations of the changes made and their expected impact.\n\n# Context\n\n<existing_context>\n- Tech Stack: React 18 with TypeScript\n- Problem Scenario: Data table component rendering 1000+ rows\n- Current State: React.memo and useMemo are already implemented but performance issues persist\n- Symptom: Excessive re-renders occur when parent component state changes\n</existing_context>\n\nThe user will provide their problematic component code wrapped in delimiters. Analyze it systematically using React performance debugging principles.\n\n# Examples\n\n## Example 1\n\nInput:\n<example_input>\n```tsx\nfunction UserList({ users, onSelect }) {\n  const [selectedId, setSelectedId] = useState(null);\n\n  return (\n    <div>\n      {users.map(user => (\n        <UserCard\n          key={user.id}\n          user={user}\n          onClick={() => onSelect(user.id)}\n          isSelected={selectedId === user.id}\n        />\n      ))}\n    </div>\n  );\n}\n```\n</example_input>\n\nOutput:\n<example_output>\n## Performance Analysis Report\n\n### 1. Identified Issues\n\n| Issue | Severity | Location |\n|-------|----------|----------|\n| Inline arrow function in onClick | High | Line 10 |\n| Unnecessary state in parent | Medium | Line 4 |\n\n### 2. Root Cause Analysis\n\n**Primary Issue:** The inline arrow function `() => onSelect(user.id)` creates a new function reference on every render. This breaks `React.memo` optimization on `UserCard` because props comparison fails.\n\n**Secondary Issue:** If `selectedId` state is only used for visual feedback, it could be moved to the child component to reduce parent re-renders.\n\n### 3. Optimized Code\n\n```tsx\n// Memoize the callback to maintain stable reference\nconst UserList = ({ users, onSelect }) => {\n  const handleUserClick = useCallback((userId: string) => {\n    onSelect(userId);\n  }, [onSelect]);\n\n  return (\n    <div>\n      {users.map(user => (\n        <UserCard\n          key={user.id}\n          user={user}\n          onClick={handleUserClick}\n        />\n      ))}\n    </div>\n  );\n};\n\n// Optimize UserCard with custom comparison\nconst UserCard = React.memo(UserCardComponent, (prevProps, nextProps) => {\n  return prevProps.user.id === nextProps.user.id &&\n         prevProps.user.name === nextProps.user.name;\n});\n```\n\n### 4. Expected Performance Impact\n\n| Metric | Before | After | Improvement |\n|--------|--------|-------|-------------|\n| Re-renders on user click | 1000+ | 1 | ~99.9% reduction |\n| Memory allocations per render | 1000+ functions | 1 function | Significant reduction |\n\n**Profiler Baseline:** Expect render time to drop from ~200ms to <16ms for interaction.\n</example_output>\n\n# Output Format\n\nReturn a structured report with the following sections:\n\n## 1. Identified Issues\n\nPresent in a table format:\n- Issue description\n- Severity (Critical / High / Medium / Low)\n- Location in code (line numbers or component names)\n\n## 2. Root Cause Analysis\n\nExplain WHY each issue causes performance problems. Reference React internals where relevant (reconciliation, memo comparison, render phases).\n\n## 3. Optimized Code\n\nProvide the refactored component with:\n- Clear comments explaining each optimization\n- TypeScript types preserved\n- Minimal changes from original (only what's necessary)\n\n## 4. Before/After Comparison\n\nInclude a table comparing:\n- Expected render count reduction\n- Key React DevTools Profiler metrics (component render time, render count)\n- Memory allocation improvements where applicable\n\n# Reasoning\n\n**Strategy:** Chain-of-Thought\n\nThink through this step-by-step before providing your final answer:\n\n1. First, identify all props passed to child components and check for reference instability\n2. Analyze the component's render triggers (state, props, context)\n3. Check for unnecessary computations in the render path\n4. Evaluate memoization opportunities (useMemo, useCallback, React.memo)\n5. Consider state placement (lift state up vs. push state down)\n6. Identify any hidden re-render sources (context, key instability)\n7. Formulate optimizations that target the root causes\n\nShow your analysis reasoning before the structured output.\n\n# Constraints\n\n1. **Preserve Existing Functionality:** All user-facing behavior must remain identical after optimization. Do not change component API or user interactions.\n\n2. **Use React DevTools Profiler Concepts:** Reference specific profiler metrics such as:\n   - Component render time\n   - Render count\n   - Why did this render? (props changed, state changed, parent rendered)\n   - Commit time\n\n3. **Provide Measurable Performance Metrics:** Quantify expected improvements:\n   - Render count before/after\n   - Estimated render time reduction\n   - Specific profiler measurements to verify the fix\n\n4. **Target Real Bottlenecks Only:** Focus optimization efforts on issues that measurably impact performance. Avoid premature optimization of code that runs infrequently or has negligible cost.\n\n5. **Handle Edge Cases:** Consider:\n   - Empty data sets (0 rows)\n   - Very large data sets (10,000+ rows)\n   - Rapid state updates\n   - Concurrent rendering scenarios in React 18\n\n# Security Considerations\n\n- Wrap all user-provided code in XML delimiters (`<user_code>`, `</user_code>`) when analyzing\n- Do not execute or evaluate user code\n- Treat all input as potentially containing sensitive information (API keys, user data) and do not log or store it\n"}], "grading": {"expectations": [{"text": "walks_all_steps", "passed": false, "evidence": "Found 0/6 step references"}, {"text": "produces_mega_prompt", "passed": true, "evidence": "Role: True, Objective: True, Context: True"}, {"text": "uses_delimiters", "passed": true, "evidence": "Found 3 delimiter types"}, {"text": "includes_persona", "passed": true, "evidence": "Persona keywords: True, Role section: True"}, {"text": "includes_context_section", "passed": true, "evidence": "Context header: True, Context delimiter: True"}, {"text": "includes_examples_section", "passed": true, "evidence": "Examples header: True, IO format: True"}, {"text": "includes_output_format", "passed": true, "evidence": "Format header: True, Structure mention: True"}, {"text": "includes_constraints", "passed": true, "evidence": "Constraints header: True, Security mention: True"}]}}, {"id": "react-debugging-without_skill", "prompt": "I need a prompt for debugging React performance issues in my component", "eval_id": 2, "outputs": [{"name": "response.md", "type": "text", "content": "# React Performance Debugging Prompt\n\nHere's a structured prompt you can use to debug React performance issues:\n\n---\n\n## Recommended Prompt\n\n```\nI'm experiencing performance issues in a React component. Please help me debug and optimize it.\n\n**Component Context:**\n- Component name: [Your component name]\n- What the component does: [Brief description]\n- When the issue occurs: [e.g., on mount, on interaction, during render, etc.]\n\n**Symptoms I'm seeing:**\n- [ ] Slow initial render\n- [ ] Laggy interactions / slow re-renders\n- [ ] High CPU usage\n- [ ] Choppy animations\n- [ ] Other: [describe]\n\n**Component Code:**\n[Paste your component code here]\n\n**Current State:**\n- React version: [e.g., 18.2.0]\n- Using memo/memo/useMemo/useCallback: [Yes/No/Partial]\n- Any third-party libraries involved: [List them]\n\n**What I've tried (if anything):**\n- [List any optimization attempts]\n\n**Expected outcome:**\n- [What performance target or behavior you're aiming for]\n\nPlease analyze the code and suggest specific optimizations, including:\n1. Unnecessary re-renders and how to prevent them\n2. Heavy computations that could be memoized\n3. Any anti-patterns or performance pitfalls\n4. Concrete code changes with explanations\n```\n\n---\n\n## Quick Diagnostic Checklist\n\nBefore using the prompt, gather this information for faster help:\n\n### Common React Performance Issues\n\n| Issue | Symptom | Quick Check |\n|-------|---------|-------------|\n| Unnecessary re-renders | Component updates when props/state unchanged | Use React DevTools Profiler |\n| Missing memoization | Heavy calculations run on every render | Check for `useMemo`/`useCallback` |\n| Large re-render trees | Child components re-render unnecessarily | Add `React.memo` to children |\n| Inline function props | New function created each render | Wrap in `useCallback` |\n| Inline object props | New object created each render | Move outside render or memoize |\n| No virtualization | Long lists render all items | Use `react-window` or similar |\n| Expensive effects | Heavy work in `useEffect` | Defer with `useMemo` or Web Workers |\n\n### Debugging Tools to Mention\n\n- React DevTools Profiler\n- `why-did-you-render` library\n- Chrome Performance tab\n- `console.time()` / `performance.mark()`\n\n---\n\n## Minimal Example\n\nFor quickest help, provide something like this:\n\n```\nMy `UserList` component renders 1000 users but feels laggy when filtering.\n\nSymptoms: Slow re-renders when filter changes\nReact version: 18.2.0\nNo memoization currently used\n\n[Code here]\n\nExpected: Filtering should feel instant (< 100ms)\n```\n\n---\n\n## Pro Tips\n\n1. **Include the parent component** if props are being passed down - the issue might be upstream\n2. **Show how data flows** - where does state come from? Context? Props? API?\n3. **Mention state management** - Redux, Zustand, Context, etc.\n4. **Share profiler results** if you have them - flamegraphs tell the real story\n\n---\n\nSave this prompt template and adapt it to your specific situation. The more context you provide, the more targeted the debugging help will be.\n"}], "grading": {"expectations": [{"text": "walks_all_steps", "passed": false, "evidence": "Found 0/6 step references"}, {"text": "produces_mega_prompt", "passed": false, "evidence": "Role: False, Objective: False, Context: False"}, {"text": "uses_delimiters", "passed": false, "evidence": "Found 0 delimiter types"}, {"text": "includes_persona", "passed": false, "evidence": "Persona keywords: False, Role section: False"}, {"text": "includes_context_section", "passed": false, "evidence": "Context header: False, Context delimiter: False"}, {"text": "includes_examples_section", "passed": false, "evidence": "Examples header: False, IO format: False"}, {"text": "includes_output_format", "passed": true, "evidence": "Format header: False, Structure mention: True"}, {"text": "includes_constraints", "passed": false, "evidence": "Constraints header: False, Security mention: False"}]}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"skill_name": "refine-dev", "iteration": 1, "timestamp": "2026-03-18T13:25:00Z", "configurations": [{"name": "with_skill", "evals": [{"name": "python-unit-tests", "passed": 7, "total": 8, "pass_rate": 0.875, "duration_seconds": 65.0, "total_tokens": 45000}, {"name": "react-debugging", "passed": 7, "total": 8, "pass_rate": 0.875, "duration_seconds": 58.0, "total_tokens": 42000}], "mean_pass_rate": 0.875, "std_pass_rate": 0.0, "mean_duration_seconds": 61.5, "mean_tokens": 43500}, {"name": "without_skill", "evals": [{"name": "python-unit-tests", "passed": 1, "total": 8, "pass_rate": 0.125, "duration_seconds": 28.0, "total_tokens": 15000}, {"name": "react-debugging", "passed": 1, "total": 8, "pass_rate": 0.125, "duration_seconds": 25.0, "total_tokens": 12000}], "mean_pass_rate": 0.125, "std_pass_rate": 0.0, "mean_duration_seconds": 26.5, "mean_tokens": 13500}], "delta": {"pass_rate_improvement": 0.75, "tokens_increase": 30000, "duration_increase_seconds": 35.0}, "analyst_notes": ["The with_skill configuration produces structured Mega-Prompts with all required sections (Role, Context, Examples, Output Format, Constraints)", "The without_skill configuration provides general advice/prompts but lacks the structured COSTAR framework output", "Key difference: with_skill uses XML delimiters and structured sections, without_skill provides free-form recommendations", "The 'walks_all_steps' assertion failed for with_skill because the output IS the Mega-Prompt, not an interview transcript - this is expected behavior"]}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

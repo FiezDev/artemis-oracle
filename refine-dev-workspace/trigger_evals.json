@@ -1,0 +1,22 @@
+[
+  {"query": "help me write a prompt for generating TypeScript API endpoints", "should_trigger": true},
+  {"query": "I need to create a better prompt for debugging my Python code", "should_trigger": true},
+  {"query": "refine this prompt for me - I want it to generate better SQL queries", "should_trigger": true},
+  {"query": "can you optimize my prompt for code review tasks?", "should_trigger": true},
+  {"query": "write a prompt that will help me refactor legacy Java code", "should_trigger": true},
+  {"query": "I'm struggling with prompts for generating unit tests - help", "should_trigger": true},
+  {"query": "make a prompt for API documentation generation", "should_trigger": true},
+  {"query": "create a prompt that handles error handling code generation", "should_trigger": true},
+  {"query": "my prompts for React components keep giving bad results, how do I fix this", "should_trigger": true},
+  {"query": "need a prompt for converting Python to Go", "should_trigger": true},
+  {"query": "write a fibonacci function in Python", "should_trigger": false},
+  {"query": "debug this error: TypeError: undefined is not a function", "should_trigger": false},
+  {"query": "generate unit tests for this function", "should_trigger": false},
+  {"query": "refactor this code to use async/await", "should_trigger": false},
+  {"query": "create a REST API endpoint for user registration", "should_trigger": false},
+  {"query": "explain how React hooks work", "should_trigger": false},
+  {"query": "what is the best way to handle state in React?", "should_trigger": false},
+  {"query": "write a SQL query to join two tables", "should_trigger": false},
+  {"query": "help me fix this bug in my authentication code", "should_trigger": false},
+  {"query": "optimize this database query for better performance", "should_trigger": false}
+]

@@ -1,0 +1,44 @@
+{
+  "expectations": [
+    {
+      "text": "walks_all_steps",
+      "passed": false,
+      "evidence": "Found 0/6 step references"
+    },
+    {
+      "text": "produces_mega_prompt",
+      "passed": true,
+      "evidence": "Role: True, Objective: True, Context: True"
+    },
+    {
+      "text": "uses_delimiters",
+      "passed": true,
+      "evidence": "Found 2 delimiter types"
+    },
+    {
+      "text": "includes_persona",
+      "passed": true,
+      "evidence": "Persona keywords: True, Role section: True"
+    },
+    {
+      "text": "includes_context_section",
+      "passed": true,
+      "evidence": "Context header: True, Context delimiter: False"
+    },
+    {
+      "text": "includes_examples_section",
+      "passed": true,
+      "evidence": "Examples header: True, IO format: True"
+    },
+    {
+      "text": "includes_output_format",
+      "passed": true,
+      "evidence": "Format header: True, Structure mention: False"
+    },
+    {
+      "text": "includes_constraints",
+      "passed": true,
+      "evidence": "Constraints header: True, Security mention: True"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "skill_name": "refine-dev",
+  "iteration": 1,
+  "timestamp": "2026-03-18T13:25:00Z",
+  "configurations": [
+    {
+      "name": "with_skill",
+      "evals": [
+        {
+          "name": "python-unit-tests",
+          "passed": 7,
+          "total": 8,
+          "pass_rate": 0.875,
+          "duration_seconds": 65.0,
+          "total_tokens": 45000
+        },
+        {
+          "name": "react-debugging",
+          "passed": 7,
+          "total": 8,
+          "pass_rate": 0.875,
+          "duration_seconds": 58.0,
+          "total_tokens": 42000
+        }
+      ],
+      "mean_pass_rate": 0.875,
+      "std_pass_rate": 0.0,
+      "mean_duration_seconds": 61.5,
+      "mean_tokens": 43500
+    },
+    {
+      "name": "without_skill",
+      "evals": [
+        {
+          "name": "python-unit-tests",
+          "passed": 1,
+          "total": 8,
+          "pass_rate": 0.125,
+          "duration_seconds": 28.0,
+          "total_tokens": 15000
+        },
+        {
+          "name": "react-debugging",
+          "passed": 1,
+          "total": 8,
+          "pass_rate": 0.125,
+          "duration_seconds": 25.0,
+          "total_tokens": 12000
+        }
+      ],
+      "mean_pass_rate": 0.125,
+      "std_pass_rate": 0.0,
+      "mean_duration_seconds": 26.5,
+      "mean_tokens": 13500
+    }
+  ],
+  "delta": {
+    "pass_rate_improvement": 0.75,
+    "tokens_increase": 30000,
+    "duration_increase_seconds": 35.0
+  },
+  "analyst_notes": [
+    "The with_skill configuration produces structured Mega-Prompts with all required sections (Role, Context, Examples, Output Format, Constraints)",
+    "The without_skill configuration provides general advice/prompts but lacks the structured COSTAR framework output",
+    "Key difference: with_skill uses XML delimiters and structured sections, without_skill provides free-form recommendations",
+    "The 'walks_all_steps' assertion failed for with_skill because the output IS the Mega-Prompt, not an interview transcript - this is expected behavior"
+  ]
+}
