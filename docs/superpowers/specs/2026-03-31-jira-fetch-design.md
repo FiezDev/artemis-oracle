@@ -1,24 +1,30 @@
-# Jira Fetch - Design Specification
+# Jira Fetch — Design Specification
 
-> Export Jira issues with configurable field mappings to Excel and CSV
+> Export Jira issues with customizable field mappings to Excel and CSV
 
-**Created**: 2026-03-31
-**Status**: Draft
-**Author**: Artemis Oracle
+**Created:** 2026-03-31
+**Author:** Artemis Oracle
+**Status:** Approved
 
 ---
 
 ## Overview
 
-Jira Fetch is a web application that connects to Jira, syncs issues to TimescaleDB, and exports them to Excel or CSV with custom field mappings.
+Jira Fetch is a full-stack web application that syncs Jira issues to TimescaleDB and exports them to Excel or CSV with user-defined field mappings through a visual interface.
 
-### Key Features
+---
 
-- Connect to Jira with API token (per-session auth)
-- Full project sync with configurable JQL filters
-- Visual field mapping editor (drag-drop)
-- Export to Excel (.xlsx) and CSV
-- Sync history and status tracking
+## Requirements Summary
+
+| Aspect | Decision |
+|--------|----------|
+| Export formats | Excel (.xlsx) + CSV |
+| Storage | TimescaleDB (existing Docker) |
+| Field mapping | GUI/Web interface |
+| Frontend | React + TypeScript |
+| Backend | Bun + Hono |
+| Auth | API token per session (localStorage) |
+| Data scope | Full project sync with configurable filters |
 
 ---
 
@@ -61,33 +67,17 @@ jira-fetch/
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS |
-| State | Zustand + TanStack Query |
-| Backend | Bun + Hono |
-| Database | TimescaleDB (PostgreSQL extension) |
-| Export | xlsx (Excel), csv-writer (CSV) |
-| Validation | Zod |
-| Drag-Drop | @dnd-kit/core |
-
----
-
-## Database Schema
-
-### Issues Table
+## Database Schema (TimescaleDB)
 
 ```sql
+-- Hypertable for Jira issues
 CREATE TABLE issues (
   id BIGSERIAL,
   issue_key VARCHAR(50) NOT NULL,
   project_key VARCHAR(50) NOT NULL,
   jira_instance_url VARCHAR(255) NOT NULL,
 
-  -- Core fields (commonly queried)
+  -- Core fields (commonly queried, extracted from raw)
   summary TEXT,
   status VARCHAR(100),
   priority VARCHAR(50),
@@ -98,7 +88,7 @@ CREATE TABLE issues (
   updated TIMESTAMPTZ,
   due_date DATE,
 
-  -- Full raw data (all fields stored here)
+  -- Full raw data (all 70+ fields stored here)
   raw_fields JSONB NOT NULL,
 
   synced_at TIMESTAMPTZ DEFAULT NOW(),
@@ -107,29 +97,30 @@ CREATE TABLE issues (
 
 SELECT create_hypertable('issues', 'synced_at');
 
+-- Indexes for common queries
 CREATE INDEX idx_issues_project ON issues(project_key);
 CREATE INDEX idx_issues_status ON issues(status);
 CREATE INDEX idx_issues_assignee ON issues(assignee);
-```
 
-### Field Mappings Table
-
-```sql
+-- Field mapping configurations
 CREATE TABLE field_mappings (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   jira_instance_url VARCHAR(255) NOT NULL,
+
+  -- Mapping: {"Jira Field Name": "Export Column Name", ...}
   mappings JSONB NOT NULL,
+
+  -- Which fields to include in export (order matters)
   field_order TEXT[] NOT NULL DEFAULT '{}',
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
+
   UNIQUE(jira_instance_url, name)
 );
-```
 
-### Sync Configurations Table
-
-```sql
+-- Sync configurations (for project sync)
 CREATE TABLE sync_configs (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -143,11 +134,8 @@ CREATE TABLE sync_configs (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
 
-### Sync Logs Table
-
-```sql
+-- Sync history logs
 CREATE TABLE sync_logs (
   id BIGSERIAL,
   jira_instance_url VARCHAR(255) NOT NULL,
@@ -167,72 +155,107 @@ CREATE TABLE sync_logs (
 SELECT create_hypertable('sync_logs', 'sync_started');
 ```
 
+### Jira Fields to Capture
+
+The following fields are downloaded from Jira and stored in `raw_fields`:
+
+**Standard Fields:**
+- Summary, Issue key, Issue id, Issue Type, Status
+- Project key, Project name, Project type, Project lead, Project lead id, Project description
+- Priority, Resolution
+- Assignee, Assignee Id, Reporter, Reporter Id, Creator, Creator Id
+- Created, Updated, Last Viewed, Resolved, Due date
+- Votes, Labels, Description, Environment
+- Original estimate, Remaining Estimate, Time Spent, Work Ratio
+- Σ Original Estimate, Σ Remaining Estimate, Σ Time Spent
+- Security Level
+- Inward/Outward issue links (Blocks)
+- Attachments
+- Comments
+- Parent, Parent key, Parent summary
+- Status Category, Status Category Changed
+
+**Custom Fields:**
+- Actual end, Actual start, Approvals
+- Atlassian project, Atlassian project status
+- Category, Change reason, Change risk, Change type
+- Comments, Delivery progress, Delivery status
+- Development, Epic Color, Epic Name, Epic Status
+- Focus Areas, Goals
+- Idea archived, Idea archived on
+- Impact, Insights, Issue color
+- Linked items, Locked forms, Open forms
+- Project overview key, Project overview status
+- Rank, Request Type, Request participants
+- Satisfaction rating, Satisfaction date
+- Sentiment, Start date
+- Story Points, Story point estimate
+- Submitted forms, Target end, Target start
+- Team Id, Team Name
+- Total forms, Vulnerability, Work category
+- [CHART] Date of First Response, [CHART] Time in Status
+
 ---
 
 ## API Endpoints
 
 ### Jira Connection
-
 ```
-POST /api/jira/connect
-Headers: X-Jira-URL, X-Jira-Email, X-Jira-Token
-Response: { success: true, user: { displayName, emailAddress } }
-
-GET /api/jira/projects
-Headers: X-Jira-URL, X-Jira-Email, X-Jira-Token
-Response: { projects: [{ key, name, lead, ... }] }
-
-POST /api/jira/search
-Headers: X-Jira-URL, X-Jira-Email, X-Jira-Token
-Body: { jql: string, fields?: string[] }
-Response: { issues: [...], total: number }
+POST   /api/jira/connect              # Validate Jira credentials
+GET    /api/jira/projects             # List available projects
+POST   /api/jira/search               # Execute JQL query, return results
 ```
 
 ### Sync Management
-
 ```
-GET /api/sync/configs
-POST /api/sync/configs
-PUT /api/sync/configs/:id
-DELETE /api/sync/configs/:id
-POST /api/sync/run/:id
-GET /api/sync/status/:id
-GET /api/sync/logs
+GET    /api/sync/configs              # List sync configurations
+POST   /api/sync/configs              # Create sync config
+PUT    /api/sync/configs/:id          # Update sync config
+DELETE /api/sync/configs/:id          # Delete sync config
+POST   /api/sync/run/:id              # Trigger manual sync
+GET    /api/sync/status/:id           # Get sync status/history
+GET    /api/sync/logs                 # List all sync logs
 ```
 
 ### Field Mappings
-
 ```
-GET /api/mappings
-POST /api/mappings
-PUT /api/mappings/:id
-DELETE /api/mappings/:id
-GET /api/mappings/fields
+GET    /api/mappings                  # List field mappings
+POST   /api/mappings                  # Create field mapping
+PUT    /api/mappings/:id              # Update field mapping
+DELETE /api/mappings/:id              # Delete field mapping
+GET    /api/mappings/fields           # Get available Jira fields (for UI dropdown)
 ```
 
 ### Issues
-
 ```
-GET /api/issues
-Query: projectKey, status, assignee, startDate, endDate, limit, offset
-Response: { issues: [...], total: number }
-
-GET /api/issues/:key
-Response: { issue: {...} }
+GET    /api/issues                    # List stored issues (with filters)
+GET    /api/issues/:key               # Get single issue details
 ```
 
 ### Export
-
 ```
-POST /api/export/excel
-POST /api/export/csv
-Body: {
-  mappingId: number,
-  projectKey?: string,
-  jql?: string,
-  dateRange?: { start: string, end: string }
+POST   /api/export/excel              # Export to Excel (.xlsx)
+POST   /api/export/csv                # Export to CSV
+```
+
+### Authentication Pattern
+
+All endpoints expect headers:
+```
+X-Jira-URL: https://yourcompany.atlassian.net
+X-Jira-Email: user@company.com
+X-Jira-Token: <API_TOKEN>
+```
+
+### Export Request Body
+
+```json
+{
+  "mappingId": 1,
+  "projectKey": "PROJ",
+  "jql": "status = Done AND updated > -30d",
+  "dateRange": { "start": "2026-01-01", "end": "2026-03-31" }
 }
-Response: Binary file download
 ```
 
 ---
@@ -242,151 +265,132 @@ Response: Binary file download
 ```
 apps/web/src/
 ├── pages/
-│   ├── Dashboard.tsx
-│   ├── Connect.tsx
-│   ├── Projects.tsx
-│   ├── FieldMapping.tsx
-│   ├── Issues.tsx
-│   └── Export.tsx
+│   ├── Dashboard.tsx           # Overview: recent syncs, quick actions
+│   ├── Connect.tsx             # Jira credentials input form
+│   ├── Projects.tsx            # Project list & sync configuration
+│   ├── FieldMapping.tsx        # Visual field mapping editor
+│   ├── Issues.tsx              # Browse stored issues with filters
+│   └── Export.tsx              # Export configuration & download
 │
 ├── components/
 │   ├── layout/
-│   │   ├── Sidebar.tsx
-│   │   └── Header.tsx
+│   │   ├── Sidebar.tsx         # Navigation
+│   │   └── Header.tsx          # User info, connection status
+│   │
 │   ├── mapping/
-│   │   ├── MappingEditor.tsx
-│   │   ├── FieldList.tsx
-│   │   ├── MappingPreview.tsx
-│   │   └── MappingSave.tsx
+│   │   ├── MappingEditor.tsx   # Drag-drop field mapping
+│   │   ├── FieldList.tsx       # Available Jira fields (left panel)
+│   │   ├── MappingPreview.tsx  # Preview table with mapped data
+│   │   └── MappingSave.tsx     # Save/update mapping modal
+│   │
 │   ├── sync/
-│   │   ├── SyncConfigForm.tsx
-│   │   ├── SyncStatus.tsx
-│   │   └── SyncHistory.tsx
+│   │   ├── SyncConfigForm.tsx  # Create/edit sync config
+│   │   ├── SyncStatus.tsx      # Progress indicator
+│   │   └── SyncHistory.tsx     # Table of past syncs
+│   │
 │   └── export/
-│       ├── ExportForm.tsx
-│       └── ExportPreview.tsx
+│       ├── ExportForm.tsx      # Format, mapping, filters
+│       └── ExportPreview.tsx   # Data preview before download
 │
 ├── hooks/
-│   ├── useJiraAuth.ts
-│   ├── useProjects.ts
-│   ├── useSync.ts
-│   └── useExport.ts
+│   ├── useJiraAuth.ts          # Manage credentials in localStorage
+│   ├── useProjects.ts          # Fetch project list
+│   ├── useSync.ts              # Sync operations
+│   └── useExport.ts            # Export operations
 │
 ├── stores/
-│   └── useAppStore.ts
+│   └── useAppStore.ts          # Zustand store (connection, UI state)
 │
 └── lib/
-    ├── api.ts
-    └── types.ts
+    ├── api.ts                  # API client (fetch wrapper)
+    └── types.ts                # Shared TypeScript types
 ```
 
-### Page Descriptions
+### Key UI Features
 
-| Page | Purpose |
-|------|---------|
-| Dashboard | Overview: recent syncs, quick actions |
-| Connect | Jira credentials input form |
-| Projects | Project list & sync configuration |
-| FieldMapping | Visual field mapping editor |
-| Issues | Browse stored issues with filters |
-| Export | Export configuration & download |
+1. **Connect Page** — Enter Jira URL, email, API token → validates and stores in localStorage
+2. **Field Mapping** — Two-panel interface:
+   - Left: Available Jira fields (draggable)
+   - Right: Export columns (drop target)
+   - Preview table shows live data with current mapping
+3. **Projects/Sync** — Configure which projects to auto-sync, set JQL filters
+4. **Export** — Select mapping, filters, choose Excel or CSV, download
 
 ---
 
-## Jira Fields to Support
+## Technical Implementation
 
-The system must handle these Jira fields (70+ total):
+### Backend Dependencies
 
-**Standard Fields:**
-- Summary, Issue key, Issue id, Issue Type, Status
-- Project key, Project name, Project type, Project lead
-- Priority, Resolution, Assignee, Reporter, Creator
-- Created, Updated, Last Viewed, Resolved, Due date
-- Votes, Labels, Description, Environment
-- Original estimate, Remaining Estimate, Time Spent, Work Ratio
-- Security Level, Attachment, Comment, Parent
+```json
+{
+  "dependencies": {
+    "hono": "^4.x",
+    "postgres": "^3.x",
+    "xlsx": "^0.x",
+    "csv-writer": "^1.x",
+    "zod": "^3.x"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}
+```
 
-**Custom Fields:**
-- Epic fields (Color, Name, Status)
-- Story Points, Story point estimate
-- Team (Id, Name)
-- Start date, Target start/end, Actual start/end
-- Sprint-related fields
-- Change management fields (reason, risk, type)
-- Request Type, Satisfaction rating
-- Development, Linked items
-- And many more...
+### Frontend Dependencies
 
-All fields stored in `raw_fields JSONB` for flexibility.
+```json
+{
+  "dependencies": {
+    "react": "^18.x",
+    "react-dom": "^18.x",
+    "react-router-dom": "^6.x",
+    "@tanstack/react-query": "^5.x",
+    "zustand": "^4.x",
+    "tailwindcss": "^3.x",
+    "@dnd-kit/core": "^6.x",
+    "lucide-react": "^0.x",
+    "xlsx": "^0.x"
+  },
+  "devDependencies": {
+    "vite": "^5.x",
+    "typescript": "^5.x"
+  }
+}
+```
 
 ---
 
 ## Error Handling
 
-| Scenario | Status | Response |
-|----------|--------|----------|
-| Invalid Jira credentials | 401 | `{error: "Invalid credentials"}` |
-| Jira rate limit | 429 | `{retryAfter: 60}` |
-| Sync in progress | 409 | `{syncId: "..."}` |
-| Export too large | 413 | `{maxIssues: 10000}` |
-| DB connection error | 503 | `{error: "Database unavailable"}` |
+| Scenario | Backend Response | Frontend Behavior |
+|----------|------------------|-------------------|
+| Invalid Jira credentials | 401 + `{error: "Invalid credentials"}` | Show login error, clear stored creds |
+| Jira rate limit | 429 + `{retryAfter: 60}` | Show warning, auto-retry after delay |
+| Sync in progress | 409 + `{syncId: "..."}` | Poll status, show progress |
+| Export too large | 413 + `{maxIssues: 10000}` | Suggest date range filter |
+| DB connection error | 503 + `{error: "Database unavailable"}` | Show error, retry button |
 
 ---
 
 ## Implementation Phases
 
-| Phase | Scope |
-|-------|-------|
-| 1 | Core API: connect, search, store issues |
-| 2 | Database sync jobs with scheduling |
-| 3 | Field mapping UI with drag-drop |
-| 4 | Export generation (Excel/CSV) |
-| 5 | Polish, error handling, testing |
-
----
-
-## Docker Compose
-
-```yaml
-services:
-  timescaledb:
-    image: timescale/timescaledb:latest-pg16
-    environment:
-      POSTGRES_USER: jira_fetch
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: jira_fetch
-    ports:
-      - "5432:5432"
-    volumes:
-      - timescale_data:/var/lib/postgresql/data
-
-  api:
-    build: ./apps/api
-    ports:
-      - "3001:3001"
-    environment:
-      DATABASE_URL: postgres://jira_fetch:${DB_PASSWORD}@timescaledb:5432/jira_fetch
-    depends_on:
-      - timescaledb
-
-  web:
-    build: ./apps/web
-    ports:
-      - "3000:3000"
-    depends_on:
-      - api
-
-volumes:
-  timescale_data:
-```
+| Phase | Scope | Duration |
+|-------|-------|----------|
+| 1 | Core API (connect, search, store) | - |
+| 2 | Database sync jobs | - |
+| 3 | Field mapping UI | - |
+| 4 | Export generation (Excel/CSV) | - |
+| 5 | Polish & error handling | - |
 
 ---
 
 ## Success Criteria
 
-1. User can connect to Jira instance with API token
-2. User can sync projects with custom JQL filters
-3. User can create and save field mappings via drag-drop UI
-4. User can export issues to Excel and CSV with mapped fields
-5. Sync history is tracked and viewable
-6. System handles 10,000+ issues without performance degradation
+- [ ] User can connect to Jira with API token
+- [ ] User can configure project sync with JQL filters
+- [ ] User can create and save custom field mappings via drag-drop UI
+- [ ] User can export synced issues to Excel (.xlsx) format
+- [ ] User can export synced issues to CSV format
+- [ ] All 70+ Jira fields are captured and available for mapping
+- [ ] Data persists in TimescaleDB across sessions
