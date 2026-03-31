@@ -124,6 +124,124 @@ jira-fetch/
 
 ---
 
+## Security Considerations
+
+### Token Storage Trade-off
+
+**Decision:** API tokens stored in browser `localStorage` and passed via headers.
+
+**Risks acknowledged:**
+- Vulnerable to XSS attacks — any malicious script can read localStorage
+- Token visible in browser dev tools
+- Token passed on every request
+
+**Mitigations:**
+- Content-Security-Policy (CSP) headers on all responses
+- HttpOnly cookies NOT used (would require backend token storage)
+- Session-scoped: token only valid during browser session
+- No server-side token persistence
+
+**Alternative considered (rejected for this use case):**
+- OAuth flow with server-side token storage — adds complexity, requires Jira app registration
+- Session-based auth with server-side token encryption — requires stateful server
+
+This trade-off is acceptable for single-user or trusted-team deployments. Not recommended for public-facing applications.
+
+---
+
+---
+
+## Sync Strategy
+
+### Pagination
+
+Jira API returns max 100 issues per page. For large projects:
+
+- **Batch size:** 100 issues per request
+- **Parallel requests:** 3 concurrent (stays under rate limit)
+- **Progress tracking:** Store `issues_synced` count in sync_logs
+
+**Example:** 10,000-issue project = 100 API calls ≈ 2-3 minutes
+
+### Incremental Sync
+
+| Sync Type | JQL Filter | Use Case |
+|-----------|------------|----------|
+| Full | `project = PROJ` | Initial sync |
+| Incremental | `project = PROJ AND updated > "{last_sync}"` | Subsequent syncs |
+
+**Logic:**
+1. First sync: Full fetch, all issues marked as "new"
+2. Subsequent syncs: Only fetch issues updated since `last_sync_at`
+3. Compare `issue_key + updated` to detect changes
+4. Insert new version if changed, otherwise skip
+
+**Orphaned Issues:** Not deleted. TimescaleDB keeps history. Use `synced_at` to query latest version.
+
+### Concurrent Sync Handling
+
+- **Lock per config:** Only one sync per `sync_config_id` at a time
+- **Timeout:** 30 minutes max (for very large projects)
+- **Crash recovery:** Syncs that don't complete within 30min marked as "failed"
+- **Queue behavior:** New sync requests while one running → return 409 with `syncId` of running sync
+
+### Rate Limit Handling
+
+Jira Cloud rate limit: ~1000 requests/minute per user.
+
+**Strategy:**
+- Max 10 requests/second (600/minute) — safe margin
+- On 429: Exponential backoff (1s, 2s, 4s, max 30s)
+- Max 5 retries per request before failing
+
+---
+
+## Field Discovery
+
+### GET `/api/mappings/fields`
+
+Returns all available fields from Jira for the connected instance.
+
+**Implementation:**
+1. Call Jira REST API `/rest/api/3/field`
+2. Parse response to extract field metadata
+3. Return structured list
+
+**Response:**
+```json
+{
+  "standard": [
+    { "id": "summary", "name": "Summary", "type": "string" },
+    { "id": "status", "name": "Status", "type": "object" },
+    { "id": "priority", "name": "Priority", "type": "object" }
+  ],
+  "custom": [
+    { "id": "customfield_10016", "name": "Story Points", "type": "number" },
+    { "id": "customfield_10014", "name": "Epic Name", "type": "string" }
+  ]
+}
+```
+
+**Custom field identification:** By field ID (e.g., `customfield_10016`) — more stable than name. Display name to user, store ID in mapping.
+
+**Renamed fields:** If custom field renamed in Jira, mapping still works (ID unchanged). UI shows warning if field name mismatch detected.
+
+---
+
+## Mapping Scope
+
+**Mappings are per-Jira-instance:**
+- `jira_instance_url` in `field_mappings` table
+- Same tool can manage multiple Jira instances
+- Mappings do NOT transfer between instances (field IDs differ)
+
+**User scope:** Single-user tool in this version. Multi-user would require:
+- `user_id` column in all tables
+- Per-user credential encryption
+- Row-level security
+
+---
+
 ## Database Schema
 
 ### Issues Table (Hypertable)
@@ -150,14 +268,21 @@ CREATE TABLE issues (
   raw_fields JSONB NOT NULL,
 
   synced_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- Primary key allows same issue at multiple sync times (history tracking)
   PRIMARY KEY (jira_instance_url, issue_key, synced_at)
 );
+
+-- Prevent duplicate issues within same sync run
+CREATE UNIQUE INDEX idx_issues_unique ON issues(jira_instance_url, issue_key)
+  WHERE synced_at = (SELECT MAX(synced_at) FROM issues i2 WHERE i2.issue_key = issues.issue_key);
 
 SELECT create_hypertable('issues', 'synced_at');
 
 CREATE INDEX idx_issues_project ON issues(project_key);
 CREATE INDEX idx_issues_status ON issues(status);
 CREATE INDEX idx_issues_assignee ON issues(assignee);
+CREATE INDEX idx_issues_updated ON issues(updated);
 ```
 
 ### Field Mappings Table
@@ -336,13 +461,14 @@ apps/web/src/
 ```json
 {
   "hono": "^4.x",
-  "@libsql/client": "^0.x",
   "postgres": "^3.x",
   "xlsx": "^0.x",
   "csv-writer": "^1.x",
   "zod": "^3.x"
 }
 ```
+
+**Note:** Using `postgres` driver directly for TimescaleDB (PostgreSQL extension). NOT using libSQL.
 
 ### Frontend
 
@@ -363,32 +489,56 @@ apps/web/src/
 
 ## Error Handling
 
-| Scenario | Response | Frontend |
-|----------|----------|----------|
-| Invalid credentials | 401 | Show error, clear creds |
-| Jira rate limit | 429 + retryAfter | Auto-retry after delay |
-| Sync in progress | 409 + syncId | Poll status |
-| Export too large | 413 | Suggest date filter |
-| DB unavailable | 503 | Show error, retry |
+| Scenario | HTTP Code | Response Body | Frontend Behavior |
+|----------|-----------|---------------|-------------------|
+| Invalid credentials | 401 | `{error: "Invalid credentials"}` | Show error, clear stored creds |
+| Jira rate limit | 429 | `{retryAfter: 60}` | Auto-retry with exponential backoff |
+| Sync in progress | 409 | `{syncId: "...", estimatedTime: 120}` | Poll status endpoint |
+| Export too large | 413 | `{maxIssues: 10000, suggestion: "Add date filter"}` | Show filter suggestion |
+| DB unavailable | 503 | `{error: "Database unavailable"}` | Show error, retry button |
+| Network timeout | 504 | `{error: "Jira API timeout"}` | Retry with longer timeout |
+| Field not found | 400 | `{field: "customfield_10016", error: "Field not found"}` | Show warning in mapping UI |
+
+### Loading States
+
+All async operations show:
+- Spinner during operation
+- Progress bar for long operations (sync, export)
+- Skeleton loaders for initial page loads
+
+### Error Messages
+
+User-friendly error messages (not raw API errors):
+- "Could not connect to Jira. Check your URL and API token."
+- "Export is too large. Try adding a date range filter."
+- "Sync took too long and was cancelled. Try a smaller project."
 
 ---
 
 ## Implementation Phases
 
-1. **Phase 1** — Core API (connect, search, store)
-2. **Phase 2** — Database sync jobs
-3. **Phase 3** — Field mapping UI
-4. **Phase 4** — Export generation (Excel/CSV)
-5. **Phase 5** — Polish & error handling
+| Phase | Focus | Duration |
+|-------|-------|----------|
+| 1 | Core API (connect, search, store) | 2-3 days |
+| 2 | Database sync jobs | 2-3 days |
+| 3 | Field mapping UI | 3-4 days |
+| 4 | Export generation (Excel/CSV) | 2 days |
+| 5 | Polish & error handling | 1-2 days |
+
+**Total:** ~10-14 days
 
 ---
 
 ## Success Criteria
 
-- [ ] Can connect to Jira Cloud with API token
-- [ ] Can sync all issues from configured projects
-- [ ] Can create/edit/delete field mappings via GUI
+- [ ] Can connect to Jira Cloud with API token (validated before proceeding)
+- [ ] Can sync all issues from configured projects with pagination
+- [ ] Incremental syncs only fetch changed issues
+- [ ] Can create/edit/delete field mappings via drag-drop GUI
 - [ ] Can export synced issues to Excel with mapped fields
 - [ ] Can export synced issues to CSV with mapped fields
-- [ ] Field mappings persist across sessions
-- [ ] Sync history is trackable
+- [ ] Field mappings persist across sessions (per Jira instance)
+- [ ] Sync history is trackable with status, counts, timestamps
+- [ ] Error messages are clear and actionable
+- [ ] Loading states shown for all async operations
+- [ ] Rate limits handled gracefully with retry
