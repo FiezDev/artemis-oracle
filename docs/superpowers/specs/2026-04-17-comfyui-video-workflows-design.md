@@ -96,7 +96,7 @@ LoadImage → ImageScale(2x) → VAEEncode → KSampler(denoise=0.4) → VAEDeco
 | ID | class_type | Key Inputs |
 |----|-----------|------------|
 | 1 | `LoadImage` | `image: "risa_body.jpeg"` |
-| 2 | `ImageScale` | `image: [1, 0], upscale_method: "nearest-exact", width: 0, height: 0, crop: "disabled", multiply_by: 2` |
+| 2 | `ImageScaleBy` | `image: [1, 0], upscale_method: "nearest-exact", scale_by: 2.0` |
 | 3 | `UNETLoader` | `unet_name: "z_image_turbo_bf16.safetensors", weight_dtype: "default"` |
 | 4 | `ModelSamplingAuraFlow` | `shift: 3.0, model: [3, 0]` |
 | 5 | `CLIPLoader` | `clip_name: "qwen_3_4b.safetensors", type: "lumina2"` |
@@ -285,6 +285,6 @@ LoadAudio ──────────┘
 
 3. **Z-Image upscale approach** — Uses img2img at 2x resolution with `denoise: 0.4`. The `ImageScale` node handles the raw pixel resize, then Z-Image refines detail. If quality is insufficient, try increasing denoise to 0.5–0.6.
 
-4. **Aspect ratio** — Workflow 16 uses `ImageScale` with `multiply_by: 2` which preserves aspect ratio. For workflow 15, the LTX spatial upscaler operates on latents and preserves the original aspect ratio automatically.
+4. **Aspect ratio** — Workflow 16 uses `ImageScaleBy` with `scale_by: 2.0` which preserves aspect ratio. For workflow 15, the LTX spatial upscaler operates on latents and preserves the original aspect ratio automatically.
 
 5. **UI format variants** — After API JSONs are validated, generate `_ui.json` companions using `api_to_ui.py` for ComfyUI canvas rendering.
