@@ -39,10 +39,10 @@ The 16 `*_ui.json` files and the 4 original stock templates were re-uploaded to 
 | 10 | `10_ltx23_t2v.json` | LTX Video 2.3 dev fp8 + distilled LoRA | T2V | queued | — | — |
 | 11 | `11_animatediff_sdxl.json` | SDXL + animatediff_sdxl_fp16 | SDXL motion | **ok** | ~3 min | `animdiff_sdxl_00002.mp4` |
 | 15 | `15_video_upscaler_ltx23.json` | LTX 2.3 spatial upscaler | Video upscale | **ok** | ~16 s | `upscale_video_00001.mp4` |
-| 16 | `16_image_upscaler_zimage.json` | Z-Image turbo | Image upscale | **ok** | — | — |
+| 16 | `16_image_upscaler_zimage.json` | Z-Image turbo | Image upscale | **queued** | — | queued ok, needs re-run solo |
 | 17 | `17_face_swap_bfs_ltx23.json` | LTX 2.3 + BFS V3 LoRA | Face swap | **blocked** | — | BFS custom node not installed |
 | 18 | `18_motion_control_sdsteady_ltx23.json` | LTX 2.3 + SDPose + SteadyDancer | I2V motion | **blocked** | — | SteadyDancer not installed |
-| 19 | `19_lipsync_latentsync.json` | LatentSync | Lip sync | **ok** | — | — |
+| 19 | `19_lipsync_latentsync.json` | LatentSync | Lip sync | **queued** | — | queued ok, needs re-run solo |
 | 20 | `20_storydiffusion_sdxl.json` | SDXL + StoryDiffusion | Character image | **blocked** | — | No SDXL checkpoint |
 
 ## Re-running
