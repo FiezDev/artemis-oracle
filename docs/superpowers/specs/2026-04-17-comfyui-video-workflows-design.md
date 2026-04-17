@@ -8,11 +8,12 @@
 
 ## Overview
 
-Five standalone ComfyUI API-format workflow JSON files for video and image processing, targeting the local ComfyUI instance (AMD Radeon 8060S, 120GB VRAM, ROCm 7.12, Docker `comfyui-gfx1151-wsl2`).
+Six standalone ComfyUI API-format workflow JSON files for video and image processing, targeting the local ComfyUI instance (AMD Radeon 8060S, 120GB VRAM, ROCm 7.12, Docker `comfyui-gfx1151-wsl2`).
 
 All files follow the existing project pattern: API-format JSONs in `workflows/model-tests/saved/`, runnable via `run.py` against `localhost:8188`.
 
 LTX 2.3 workflows (17, 18) use the `SamplerCustom` + `LTXVConditioning` + `ModelSamplingLTXV` pattern established in the existing `10_ltx23_t2v.json`.
+Workflow 20 (StoryDiffusion) uses SDXL with consistent self-attention for character-consistent image generation.
 
 ## File Inventory
 
@@ -23,6 +24,7 @@ LTX 2.3 workflows (17, 18) use the `SamplerCustom` + `LTXVConditioning` + `Model
 | 17 | `17_face_swap_bfs_ltx23.json` | Video face swap (persistent template) | LTX 2.3 + BFS V3 LoRA |
 | 18 | `18_motion_control_sdsteady_ltx23.json` | I2V with pose/motion control | LTX 2.3 + SDPose + SteadyDancer |
 | 19 | `19_lipsync_latentsync.json` | Lip sync from audio | LatentSync |
+| 20 | `20_storydiffusion_sdxl.json` | Character-consistent image gen | SDXL + StoryDiffusion |
 
 ---
 
@@ -241,6 +243,56 @@ LoadAudio ──────────┘
 
 ---
 
+## Workflow 20 — StoryDiffusion Character Image Generation
+
+**Goal:** Generate character-consistent images using SDXL + StoryDiffusion's consistent self-attention mechanism. Takes a reference character image and a scene prompt, outputs images that maintain the character's identity.
+
+### Pipeline
+
+```
+LoadImage (ref character) ──→ StoryDiffusion_Apply ──→ KSampler ──→ VAEDecode ──→ SaveImage
+                              ↑           ↑               ↑
+                    CheckpointLoader(SDXL)  │        CLIPTextEncode
+                    CLIPVisionLoader         │      ConditioningZeroOut
+                    (CLIP-ViT-bigG)          │
+                    ms_adapter.bin ──────────┘
+```
+
+### Nodes
+
+| ID | class_type | Key Inputs |
+|----|-----------|------------|
+| 1 | `CheckpointLoaderSimple` | `ckpt_name: "sdxl_base_1.0.safetensors"` |
+| 2 | `LoadImage` | `image: "risa_avatar.jpeg"` |
+| 3 | **`CLIPVisionLoader`** (class_type TBD) | `clip_name: "CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors"` |
+| 4 | **`StoryDiffusion_Apply`** (class_type TBD) | `model: [1, 0], reference_image: [2, 0], clip_vision: [3, 0], adapter_path: "ms_adapter.bin", seed: 20260417` |
+| 5 | `CLIPTextEncode` | `text: "a young woman sitting at a cafe table, warm lighting, detailed face, portrait photo, 4k", clip: [1, 1]` |
+| 6 | `ConditioningZeroOut` | `conditioning: [5, 0]` |
+| 7 | `EmptyLatentImage` | `width: 1024, height: 1024, batch_size: 1` |
+| 8 | `KSampler` | `seed: 20260417, steps: 25, cfg: 7.0, sampler_name: "euler", scheduler: "normal", denoise: 1.0, model: [4, 0], positive: [5, 0], negative: [6, 0], latent_image: [7, 0]` |
+| 9 | `VAEDecode` | `samples: [8, 0], vae: [1, 2]` |
+| 10 | `SaveImage` | `images: [9, 0], filename_prefix: "storydiffusion"` |
+
+### StoryDiffusion Details
+
+StoryDiffusion uses **consistent self-attention** to maintain character identity across generated images. The `ms_adapter.bin` model enables the self-attention mechanism that locks in facial features from the reference image. Optional `photomaker-v1.bin` can be added for enhanced identity preservation.
+
+**Key features:**
+- Dual-role generation: prompt with `(A and B)` to place two instances of the same character in one frame
+- LoRA integration: chain `LoraLoaderModelOnly` after checkpoint for style control
+- img2img mode: replace `EmptyLatentImage` with `VAEEncode` of a base image for guided generation
+
+### Open Items (resolve during implementation)
+1. **Exact class_types** — Query `/object_info` after installing `ComfyUI_StoryDiffusion`. Node names may be `StoryDiffusion_ConsistentCharacter`, `StoryDiffusionSampler`, or similar.
+2. **SDXL checkpoint** — Confirm which SDXL checkpoint is available in `/data/models/checkpoints/`. Alternatives: `sdxl_refiner_1.0.safetensors`, custom SDXL fine-tunes.
+3. **CLIP vision encoder path** — Must be placed in `/data/models/clip_vision/` (or wherever ComfyUI expects vision encoders).
+4. **ms_adapter.bin path** — Download from `https://huggingface.co/InstantX/StoryDiffusion` into the directory expected by the custom node (typically `ComfyUI_StoryDiffusion/models/`).
+
+### Output
+- `storydiffusion_00001_.png` — character-consistent image based on reference + prompt
+
+---
+
 ## Dependencies
 
 ### Custom Nodes (must be installed)
@@ -252,6 +304,7 @@ LoadAudio ──────────┘
 | `ComfyUI-SteadyDancer` | `1038lab/ComfyUI-SteadyDancer` | Motion transfer from pose | **needs install** |
 | `ComfyUI-VideoHelperSuite` | already installed | VHS_LoadVideo, VHS_VideoCombine | installed |
 | `LatentSync` | already installed | Lip sync | installed |
+| `ComfyUI_StoryDiffusion` | `HvisionBiao/ComfyUI_StoryDiffusion` | Character-consistent image generation | **needs install** |
 
 ### Model Files (must be in `/data/models/`)
 
@@ -265,6 +318,9 @@ LoadAudio ──────────┘
 | `qwen_3_4b.safetensors` | `/data/models/clip/` | WF 16 | already present |
 | `ae.safetensors` | `/data/models/vae/` | WF 16 | already present |
 | BFS V3 LoRA | `/data/models/loras/` | WF 17 | **needs download** from `Alissonerdx/BFS-Best-Face-Swap-Video` |
+| `sdxl_base_1.0.safetensors` | `/data/models/checkpoints/` | WF 20 | **needs download** (or use existing SDXL checkpoint) |
+| `CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors` | `/data/models/clip_vision/` | WF 20 | **needs download** from `laion/CLIP-ViT-bigG-14-laion2B-39B-b160k` |
+| `ms_adapter.bin` | `ComfyUI_StoryDiffusion/models/` | WF 20 | **needs download** from `InstantX/StoryDiffusion` |
 
 ### Reference Assets (in `/data/input/`)
 
@@ -272,6 +328,7 @@ LoadAudio ──────────┘
 |-------|---------|
 | `risa_body.jpeg` | WF 16, 18 |
 | `risa_face.jpeg` | WF 17 |
+| `risa_avatar.jpeg` | WF 20 |
 | `fashion_face1.jpeg` | WF 19 |
 | `dance_cute1.mp4` | WF 15, 17, 18 |
 
@@ -288,3 +345,7 @@ LoadAudio ──────────┘
 4. **Aspect ratio** — Workflow 16 uses `ImageScaleBy` with `scale_by: 2.0` which preserves aspect ratio. For workflow 15, the LTX spatial upscaler operates on latents and preserves the original aspect ratio automatically.
 
 5. **UI format variants** — After API JSONs are validated, generate `_ui.json` companions using `api_to_ui.py` for ComfyUI canvas rendering.
+
+6. **StoryDiffusion character reference** — `risa_avatar.jpeg` is the preferred reference for WF 20 as it provides a clear face+upper-body shot for identity locking. For dual-character scenes, use `(A and B)` syntax in the prompt and provide two reference images if the node supports it.
+
+7. **SDXL checkpoint availability** — Check `/data/models/checkpoints/` for any existing SDXL checkpoint before downloading. The workflow can use any SDXL 1.0 base or fine-tune.
