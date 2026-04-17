@@ -1,0 +1,6 @@
+{
+  "1": {"class_type": "LoadImage", "inputs": {"image": "fashion_face1.jpeg"}},
+  "2": {"class_type": "LoadAudio", "inputs": {"audio": "dance_cute1.mp4"}},
+  "3": {"class_type": "LatentSyncNode", "inputs": {"images": ["1", 0], "audio": ["2", 0], "seed": 42, "lips_expression": 1.5, "inference_steps": 20}},
+  "4": {"class_type": "VHS_VideoCombine", "inputs": {"frame_rate": 16, "loop_count": 0, "filename_prefix": "lipsync", "format": "video/h264-mp4", "pingpong": false, "save_output": true, "images": ["3", 0]}}
+}
