@@ -1,0 +1,14 @@
+{
+  "1": {"class_type": "LoadImage", "inputs": {"image": "risa_body.jpeg"}},
+  "2": {"class_type": "ImageScaleBy", "inputs": {"image": ["1", 0], "upscale_method": "nearest-exact", "scale_by": 2.0}},
+  "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "z_image_turbo_bf16.safetensors", "weight_dtype": "default"}},
+  "4": {"class_type": "ModelSamplingAuraFlow", "inputs": {"shift": 3.0, "model": ["3", 0]}},
+  "5": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "lumina2"}},
+  "6": {"class_type": "VAELoader", "inputs": {"vae_name": "ae.safetensors"}},
+  "7": {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0], "vae": ["6", 0]}},
+  "8": {"class_type": "CLIPTextEncode", "inputs": {"text": "high quality, detailed, sharp, 4k, professional photo", "clip": ["5", 0]}},
+  "9": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["8", 0]}},
+  "10": {"class_type": "KSampler", "inputs": {"seed": 20260417, "steps": 4, "cfg": 1.0, "sampler_name": "res_multistep", "scheduler": "simple", "denoise": 0.4, "model": ["4", 0], "positive": ["8", 0], "negative": ["9", 0], "latent_image": ["7", 0]}},
+  "11": {"class_type": "VAEDecode", "inputs": {"samples": ["10", 0], "vae": ["6", 0]}},
+  "12": {"class_type": "SaveImage", "inputs": {"images": ["11", 0], "filename_prefix": "upscale_image"}}
+}
