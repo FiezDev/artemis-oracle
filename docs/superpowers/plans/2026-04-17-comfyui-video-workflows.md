@@ -422,7 +422,7 @@ Use the spec node table, substituting resolved class_types for nodes 3 and 4. Re
   "4": {"class_type": "<RESOLVED_STORYDIFFUSION_NODE>", "inputs": {"model": ["1", 0], "reference_image": ["2", 0], "clip_vision": ["3", 0], "seed": 20260417}},
   "5": {"class_type": "CLIPTextEncode", "inputs": {"text": "a young woman sitting at a cafe table, warm lighting, detailed face, portrait photo, 4k", "clip": ["1", 1]}},
   "6": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["5", 0]}},
-  "7": {"class_type": "EmptySD3LatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+  "7": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
   "8": {"class_type": "KSampler", "inputs": {"seed": 20260417, "steps": 25, "cfg": 7.0, "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0, "model": ["4", 0], "positive": ["5", 0], "negative": ["6", 0], "latent_image": ["7", 0]}},
   "9": {"class_type": "VAEDecode", "inputs": {"samples": ["8", 0], "vae": ["1", 2]}},
   "10": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": "storydiffusion"}}
