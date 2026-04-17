@@ -1,0 +1,10 @@
+{
+  "_TODO": "No SDXL checkpoint available. Install one in /data/models/checkpoints/ and update node 1. StoryDiffusion nodes ARE installed.",
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "sdxl_base_1.0.safetensors"}},
+  "2": {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": "CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors"}},
+  "3": {"class_type": "StoryDiffusion_Apply", "inputs": {"model": ["1", 0], "vae": ["1", 2], "infer_mode": "original", "photomake_ckpt": "photomaker-v1.bin", "ipadapter_ckpt": "ip-adapter-plus_sdxl.bin", "quantize_mode": "fp16", "lora_scale": 0.0, "extra_function": "none"}},
+  "4": {"class_type": "StoryDiffusion_CLIPTextEncode", "inputs": {"clip": ["1", 1], "switch": "Comic", "width": 1024, "height": 1024, "role_text": "a young woman, ## (character)", "scene_text": "sitting at a cafe table", "pos_text": "warm lighting, detailed face, portrait photo, 4k, best quality", "neg_text": "bad quality, worst quality", "lora_trigger_words": "", "add_style": "Photomaker", "mask_threshold": 0.5, "extra_param": "", "guidance_list": ""}},
+  "5": {"class_type": "StoryDiffusion_KSampler", "inputs": {"model": ["3", 0], "seed": 20260417, "steps": 25, "cfg": 7.0, "sampler_name": "euler", "scheduler": "normal", "positive": ["4", 0], "negative": ["4", 1], "condition": ["4", 2], "latent_image": ["4", 3], "sa32_degree": 0.5, "sa64_degree": 0.5, "denoise": 1.0}},
+  "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+  "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "storydiffusion"}}
+}

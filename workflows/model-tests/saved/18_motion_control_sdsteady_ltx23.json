@@ -1,0 +1,20 @@
+{
+  "_TODO": "SteadyDancer custom node NOT INSTALLED. Resolve class_type for node 6 after installing ComfyUI-SteadyDancer. SDPose IS installed (SDPoseKeypointExtractor).",
+  "1": {"class_type": "LoadImage", "inputs": {"image": "risa_body.jpeg"}},
+  "2": {"class_type": "VHS_LoadVideo", "inputs": {"video": "dance_cute1.mp4", "force_rate": 0, "custom_width": 0, "custom_height": 0, "frame_load_cap": 49, "skip_first_frames": 0, "select_every_nth": 1}},
+  "3": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
+  "4": {"class_type": "LTXAVTextEncoderLoader", "inputs": {"text_encoder": "ltx-2.3-22b-dev_embeddings_connectors.safetensors", "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors", "device": "default"}},
+  "5": {"class_type": "SDPoseKeypointExtractor", "inputs": {"model": "TODO", "vae": "TODO", "image": ["2", 0], "batch_size": 1}},
+  "6": {"class_type": "TODO_STEADYDANCER", "inputs": {"image": ["1", 0], "pose": ["5", 0]}},
+  "7": {"class_type": "VAEEncode", "inputs": {"pixels": ["6", 0], "vae": ["3", 2]}},
+  "8": {"class_type": "CLIPTextEncode", "inputs": {"text": "character dancing gracefully, fluid movement, cinematic lighting", "clip": ["4", 0]}},
+  "9": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry, low quality, static, deformed", "clip": ["4", 0]}},
+  "10": {"class_type": "LTXVConditioning", "inputs": {"positive": ["8", 0], "negative": ["9", 0], "frame_rate": 24}},
+  "11": {"class_type": "ModelSamplingLTXV", "inputs": {"max_shift": 2.05, "base_shift": 0.95, "model": ["3", 0]}},
+  "12": {"class_type": "LTXVScheduler", "inputs": {"steps": 8, "max_shift": 2.05, "base_shift": 0.95, "stretch": true, "terminal": 0.1}},
+  "13": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+  "14": {"class_type": "RandomNoise", "inputs": {"noise_seed": 20260417}},
+  "15": {"class_type": "SamplerCustom", "inputs": {"add_noise": true, "noise_seed": 20260417, "cfg": 3.0, "model": ["11", 0], "positive": ["10", 0], "negative": ["10", 1], "sampler": ["13", 0], "sigmas": ["12", 0], "latent_image": ["7", 0]}},
+  "16": {"class_type": "VAEDecode", "inputs": {"samples": ["15", 0], "vae": ["3", 2]}},
+  "17": {"class_type": "VHS_VideoCombine", "inputs": {"images": ["16", 0], "frame_rate": 24, "loop_count": 0, "filename_prefix": "motion_control", "format": "video/h264-mp4", "pingpong": false, "save_output": true}}
+}
