@@ -1,0 +1,55 @@
+Use local image /home/bjgdr/oracle/artemis-oracle/template.jpg as the fixed AI Inspire Facebook template reference.
+
+Create ONE finished square Facebook infographic in a single generated image. Do not rely on later local compositing or post-generation editing for the infographic content.
+
+Use GPT Image 2 quality with thinking/planning mode internally: plan the layout, Thai line breaks, text scale, logo-safe areas, and right-side visual before rendering. Do not show the reasoning; render only the final polished image.
+
+STRICT TEMPLATE RULES:
+- Preserve the bottom bar exactly as shown in the template reference.
+- Do not cover, move, crop, repaint, blur, distort, or alter the bottom bar.
+- Keep the AI INSPIRE text/logo on bottom left exactly visible.
+- Keep the circular brain logo on bottom right exactly visible and unobstructed.
+- All new infographic content must stay above the bottom bar.
+- Nothing should overlap or distort the brain logo.
+
+APPROVED STYLE TARGET:
+Match the polished AI Inspire DeepSeek V4 sample: large editorial headline on the left, Thai subtitle, numbered octagon bullet markers, navy-white-gold palette, and a rich topic-specific technical illustration on the right.
+
+LAYOUT:
+- Left side: clean infographic content, about 60% width.
+- Right side: meaningful visual area, about 40% width.
+- Blend the visual naturally into the white template background; no hard vertical split.
+- Keep all content above the bottom bar.
+
+CONTENT:
+Headline: Claude Creative
+Subtitle: AI ย้ายจาก chat box เข้าไปอยู่ใน creative software
+Kicker: CREATIVE WORKFLOW
+
+Key points, all text complete with no ellipsis:
+1. From chat to canvas
+AI ช่วยแก้ไฟล์ ไม่ใช่แค่ตอบข้อความ
+
+2. Creative tools
+เชื่อม workflow ของ design, video และ 3D
+
+3. Agent workflow
+วางแผน ปรับงาน และส่งต่อใน app
+
+4. Human control
+creator ยังเป็นคนตัดสินใจสุดท้าย
+
+CTA box:
+AI creative ที่ดีควรอยู่ใน workflow ไม่ใช่แยกเป็นอีกหน้าต่าง
+
+VISUAL DIRECTION:
+Right side should show a professional creative workstation with layered design, video, and 3D panels connected by an agent workflow graph. Include timeline, canvas, material nodes, and command paths. Do not use official Adobe, Blender, Autodesk, or Claude logos. Avoid generic chatbot screens.
+
+STYLE:
+- Premium AI/tech editorial infographic.
+- Navy, white, muted steel blue, warm gold accents.
+- Use high contrast readable typography.
+- Ensure every bullet ends naturally and no text is truncated, clipped, or overflowing.
+- No ellipsis.
+- No fake unreadable paragraphs.
+- No fake logos or watermark.

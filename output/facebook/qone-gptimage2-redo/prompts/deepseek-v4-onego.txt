@@ -1,0 +1,60 @@
+Use local image /home/bjgdr/oracle/artemis-oracle/template.jpg as the fixed AI Inspire Facebook template reference.
+
+Create ONE finished square Facebook infographic in a single generated image. Do not rely on later local compositing or post-generation editing for the infographic content.
+
+Use GPT Image 2 quality with thinking/planning mode internally: plan the layout, Thai line breaks, text scale, logo-safe areas, and right-side visual before rendering. Do not show the reasoning; render only the final polished image.
+
+STRICT TEMPLATE RULES:
+- Preserve the bottom bar exactly as shown in the template reference.
+- Do not cover, move, crop, repaint, blur, distort, or alter the bottom bar.
+- Keep the AI INSPIRE text/logo on bottom left exactly visible.
+- Keep the circular brain logo on bottom right exactly visible and unobstructed.
+- All new infographic content must stay above the bottom bar.
+- Nothing should overlap or distort the brain logo.
+- Top-left and bottom-right brush/shade areas may be artistically improved if useful.
+
+APPROVED STYLE TARGET:
+Match the polished AI Inspire DeepSeek V4 sample: large editorial headline on the left, Thai subtitle, numbered octagon bullet markers, navy-white-gold palette, and a rich topic-specific technical illustration on the right. The right visual should feel built into the template, not pasted on top.
+
+LAYOUT:
+- Left side: clean infographic content, about 60% width.
+- Right side: meaningful technical visual, about 40% width.
+- Blend the visual naturally into the white template background with smoke, light, particles, or brush texture. No hard vertical split.
+- Keep all content above the bottom bar.
+
+CONTENT:
+Headline: DeepSeek V4
+Subtitle: โมเดลใหญ่ที่ชนะด้วย engineering ไม่ใช่แค่ GPU
+Kicker: SYSTEM EFFICIENCY
+
+Key points, all text complete with no ellipsis:
+1. Hybrid attention
+CSA + HCA + sliding window เลือกจำสิ่งสำคัญ
+
+2. KV cache pressure
+ลดภาระ memory ของ context ยาวมาก
+
+3. MHC stability
+คุม signal ไม่ให้ training ระเบิด
+
+4. Wave pipeline
+ให้ compute กับ network transfer ซ้อนกัน
+
+5. Curriculum
+ไต่ context จาก 4K ไปถึง 1M tokens
+
+CTA box:
+constraint ทำให้ทีมออกแบบระบบฉลาดกว่า brute force scale
+
+VISUAL DIRECTION:
+Right side should show DeepSeek V4 engineering: transformer block stack with Hybrid Attention highlighted, attention heatmap, GPU cluster, wave pipeline chart showing compute/network overlap, and context window scaling from 4K to 1M tokens. Use a premium technical diagram style with navy, white, gold, and soft cyan accents. No random robots or generic AI faces.
+
+STYLE:
+- Premium AI/tech editorial infographic.
+- Navy, white, muted steel blue, warm gold accents.
+- Use high contrast readable typography.
+- Ensure every bullet ends naturally and no text is truncated, clipped, or overflowing.
+- No ellipsis.
+- No fake unreadable paragraphs.
+- No fake logos or watermark.
+- Final result should look ready for Facebook.

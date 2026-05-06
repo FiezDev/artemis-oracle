@@ -1,0 +1,54 @@
+Use local image /home/bjgdr/oracle/artemis-oracle/template.jpg as the fixed AI Inspire Facebook template reference.
+
+Create ONE finished square Facebook infographic in a single generated image. Do not rely on later local compositing or post-generation editing for the infographic content.
+
+Use GPT Image 2 quality with thinking/planning mode internally: plan the layout, Thai line breaks, text scale, logo-safe areas, and right-side visual before rendering. Do not show the reasoning; render only the final polished image.
+
+STRICT TEMPLATE RULES:
+- Preserve the bottom bar exactly as shown in the template reference.
+- Do not cover, move, crop, repaint, blur, distort, or alter the bottom bar.
+- Keep the AI INSPIRE text/logo on bottom left exactly visible.
+- Keep the circular brain logo on bottom right exactly visible and unobstructed.
+- All new infographic content must stay above the bottom bar.
+- Nothing should overlap or distort the brain logo.
+
+APPROVED STYLE TARGET:
+Match the polished AI Inspire DeepSeek V4 sample: large editorial headline on the left, Thai subtitle, numbered octagon bullet markers, navy-white-gold palette, and a rich topic-specific technical illustration on the right.
+
+LAYOUT:
+- Left side: clean infographic content, about 60% width.
+- Right side: meaningful visual area, about 40% width.
+- Blend the visual naturally into the white template background; no hard vertical split.
+- Keep all content above the bottom bar.
+
+CONTENT:
+Headline: Vista 4D
+Subtitle: วิดีโอธรรมดา กลายเป็นฉาก 4D ที่แก้ไขได้
+Kicker: VIDEO TO EDITABLE SCENE
+
+Key points, all text complete with no ellipsis:
+1. Video to scene
+แยกวัตถุ กล้อง และเวลาออกจากคลิป
+
+2. Edit after capture
+เปลี่ยนมุม วัตถุ หรือแสงหลังถ่าย
+
+3. Creator workflow
+footage กลายเป็น asset สำหรับงาน 3D
+
+4. Hard problem
+ต้องคุม geometry, motion และ consistency
+
+CTA box:
+อนาคตของ video AI อาจเป็นการแก้ฉาก ไม่ใช่แค่สร้างคลิป
+
+VISUAL DIRECTION:
+Right side should show a video frame transforming into an editable 4D scene: layered object masks, depth map, camera path arcs, timeline grid, 3D reconstruction wireframe, and a clean scene editor feel. Navy, white, gold, soft cyan. Avoid generic neon, random robots, or meaningless AI symbols.
+
+STYLE:
+- Premium AI/tech editorial infographic.
+- Use high contrast readable typography.
+- Ensure every bullet ends naturally and no text is truncated, clipped, or overflowing.
+- No ellipsis.
+- No fake unreadable paragraphs.
+- No fake logos or watermark.
