@@ -1,0 +1,16 @@
+{
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
+  "2": {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": "ltx-2.3-22b-distilled-lora-384.safetensors", "strength_model": 1.0, "model": ["1", 0]}},
+  "3": {"class_type": "LTXAVTextEncoderLoader", "inputs": {"text_encoder": "ltx-2.3-22b-dev_embeddings_connectors.safetensors", "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors", "device": "default"}},
+  "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "a young Thai-Japanese woman with long dark hair wearing modern streetwear, dancing gracefully on a neon-lit Tokyo rooftop at night, smooth motion, cinematic lighting", "clip": ["3", 0]}},
+  "5": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry, low quality, static, deformed", "clip": ["3", 0]}},
+  "6": {"class_type": "LTXVConditioning", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "frame_rate": 24}},
+  "7": {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": 384, "height": 576, "length": 25, "batch_size": 1}},
+  "8": {"class_type": "ModelSamplingLTXV", "inputs": {"max_shift": 2.05, "base_shift": 0.95, "model": ["2", 0]}},
+  "9": {"class_type": "LTXVScheduler", "inputs": {"steps": 8, "max_shift": 2.05, "base_shift": 0.95, "stretch": true, "terminal": 0.1}},
+  "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+  "11": {"class_type": "RandomNoise", "inputs": {"noise_seed": 20260417}},
+  "12": {"class_type": "SamplerCustom", "inputs": {"add_noise": true, "noise_seed": 20260417, "cfg": 3.0, "model": ["8", 0], "positive": ["6", 0], "negative": ["6", 1], "sampler": ["10", 0], "sigmas": ["9", 0], "latent_image": ["7", 0]}},
+  "13": {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["1", 2]}},
+  "14": {"class_type": "VHS_VideoCombine", "inputs": {"frame_rate": 24, "loop_count": 0, "filename_prefix": "test_10_ltx23_t2v", "format": "video/h264-mp4", "pingpong": false, "save_output": true, "images": ["13", 0]}}
+}

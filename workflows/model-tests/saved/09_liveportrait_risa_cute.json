@@ -1,0 +1,55 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "risa_face.jpeg"
+    }
+  },
+  "2": {
+    "class_type": "VHS_LoadVideo",
+    "inputs": {
+      "video": "dance_cute1.mp4",
+      "force_rate": 0,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 16,
+      "skip_first_frames": 0,
+      "select_every_nth": 1
+    }
+  },
+  "3": {
+    "class_type": "AdvancedLivePortrait",
+    "inputs": {
+      "retargeting_eyes": 1.0,
+      "retargeting_mouth": 1.0,
+      "crop_factor": 1.5,
+      "turn_on": true,
+      "tracking_src_vid": false,
+      "animate_without_vid": false,
+      "command": "",
+      "src_images": [
+        "1",
+        0
+      ],
+      "driving_images": [
+        "2",
+        0
+      ]
+    }
+  },
+  "4": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "frame_rate": 8,
+      "loop_count": 0,
+      "filename_prefix": "liveportrait_risa",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "3",
+        0
+      ]
+    }
+  }
+}

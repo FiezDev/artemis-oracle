@@ -157,6 +157,22 @@ CHECKPOINT_JS = (
     "})()"
 )
 
+COMPOSER_ROOT_JS = (
+    "function composerRoot() {"
+    " const roots = Array.from(document.querySelectorAll('[role=dialog], [role=presentation], div'));"
+    " const candidates = roots.filter(d => {"
+    "   const r = d.getBoundingClientRect();"
+    "   if (r.width < 320 || r.height < 180 || r.width > 900 || r.height > 900) return false;"
+    "   const text = d.innerText || '';"
+    "   if (!/Create post|Post settings|Scheduling options/i.test(text)) return false;"
+    "   return !!d.querySelector('[contenteditable=true], [role=\"textbox\"], textarea, input[role=combobox]');"
+    " });"
+    " candidates.sort((a, b) => (a.getBoundingClientRect().width * a.getBoundingClientRect().height)"
+    "   - (b.getBoundingClientRect().width * b.getBoundingClientRect().height));"
+    " return candidates[0] || null;"
+    "}"
+)
+
 
 def detect_checkpoint() -> str | None:
     """Return a short reason string if a checkpoint/2FA page is detected."""
@@ -423,8 +439,8 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
     for _ in range(30):
         actor = eval_js(
             "(() => {"
-            " const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-            "   .find(d => /Create post/i.test(d.innerText || ''));"
+            f" {COMPOSER_ROOT_JS}"
+            " const d = composerRoot();"
             " if (!d || !d.querySelector('[contenteditable=true], [role=\"textbox\"], textarea')) return 'NO-COMPOSER-DIALOG';"
             " const txt = d.innerText || '';"
             " const m = txt.match(/Create post\\n([^\\n]+)\\n/);"
@@ -441,8 +457,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
 
     # Mark + type into the contenteditable (selector-targeted, so focus is on the right element).
     ab('eval',
-       "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-       "   .find(d => /Create post/i.test(d.innerText || ''));"
+       "(() => {"
+       f" {COMPOSER_ROOT_JS}"
+       " const d = composerRoot();"
        " const ce = d && d.querySelector('[contenteditable=true], [role=\"textbox\"], textarea');"
        " if (!ce) return 'no-ce'; ce.setAttribute('data-ab-compose', '1'); ce.focus(); return 'marked'; })()")
     time.sleep(1)
@@ -456,7 +473,19 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
             raise RuntimeError(f"Image not found: {', '.join(missing)}")
         print(f'[post] attaching images: {len(paths)}')
         try:
-            ab('upload', '[role=dialog] input[type="file"]', *[str(p) for p in paths])
+            marker = eval_js(
+                "(() => {"
+                f" {COMPOSER_ROOT_JS}"
+                " const d = composerRoot();"
+                " const input = d && d.querySelector('input[type=\"file\"]');"
+                " if (!input) return 'no-file-input';"
+                " input.setAttribute('data-ab-compose-file', '1');"
+                " return 'marked';"
+                "})()"
+            ).strip().strip('"')
+            if marker != 'marked':
+                raise RuntimeError(marker)
+            ab('upload', '[data-ab-compose-file="1"]', *[str(p) for p in paths])
             time.sleep(5)
         except RuntimeError as e:
             shot = screenshot('upload-failed')
@@ -464,8 +493,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
 
     # Click "Next" to reveal the final Post button.
     ab('eval',
-       "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-       "   .find(d => /Create post/i.test(d.innerText || ''));"
+       "(() => {"
+       f" {COMPOSER_ROOT_JS}"
+       " const d = composerRoot();"
        " const nxt = Array.from(d.querySelectorAll('[role=button]')).find(b => (b.innerText||'').trim() === 'Next');"
        " if (nxt) nxt.setAttribute('data-ab-next', '1');"
        " return nxt ? 'marked' : 'no-next'; })()")
@@ -482,8 +512,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
         print(f'[post] scheduling for {date_value} {time_value} Asia/Bangkok')
 
         marker = eval_js(
-            "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-            "   .find(d => /Post settings|Create post/i.test(d.innerText || ''));"
+            "(() => {"
+            f" {COMPOSER_ROOT_JS}"
+            " const d = composerRoot();"
             " if (!d) return 'no-dialog';"
             " const btn = Array.from(d.querySelectorAll('[role=button], button'))"
             "   .find(b => (b.innerText || '').includes('Scheduling options'));"
@@ -500,8 +531,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
         time.sleep(3)
 
         inputs = eval_js(
-            "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-            "   .find(d => /Scheduling options/i.test(d.innerText || ''));"
+            "(() => {"
+            f" {COMPOSER_ROOT_JS}"
+            " const d = composerRoot();"
             " const inputs = Array.from(d ? d.querySelectorAll('input[role=combobox]') : []);"
             " if (inputs.length < 2) return 'not-enough-inputs:' + inputs.length;"
             " inputs[0].setAttribute('data-ab-schedule-date', '1');"
@@ -517,8 +549,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
         time.sleep(1)
 
         marker = eval_js(
-            "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-            "   .find(d => /Scheduling options/i.test(d.innerText || ''));"
+            "(() => {"
+            f" {COMPOSER_ROOT_JS}"
+            " const d = composerRoot();"
             " const btn = Array.from(d ? d.querySelectorAll('[role=button], button') : [])"
             "   .find(b => (b.innerText || '').trim() === 'Schedule for later');"
             " if (!btn) return 'no-schedule-for-later';"
@@ -535,8 +568,9 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
 
     # Click the final Post/Schedule button.
     ab('eval',
-       "(() => { const d = Array.from(document.querySelectorAll('[role=dialog]'))"
-       "   .find(d => /Post settings|Create post/i.test(d.innerText || ''));"
+       "(() => {"
+       f" {COMPOSER_ROOT_JS}"
+       " const d = composerRoot();"
        " if (!d) return 'already-posted';"
        f" const post = Array.from(d.querySelectorAll('[role=button], button')).find(b => (b.innerText||'').trim() === '{final_button_text}');"
        " if (!post) return 'no-post-btn';"
@@ -561,11 +595,14 @@ def do_post_as_page(text: str, image_paths: list[str], schedule_at: datetime | N
             "(() => {"
             f" const probe = {caption_probe_js};"
             f" const expectedAction = {expected_action_js};"
+            f" {COMPOSER_ROOT_JS}"
             " const body = document.body?.innerText || '';"
             " if (probe && body.includes(probe) && /Scheduled by|Scheduled|Posted by|Posted/i.test(body)) return expectedAction.toLowerCase() + '-visible';"
+            " const root = composerRoot();"
             " const dialogs = Array.from(document.querySelectorAll('[role=dialog]'))"
             "   .filter(d => { const r = d.getBoundingClientRect(); return r.width > 0 && r.height > 0; });"
-            " if (dialogs.length === 0) return 'closed';"
+            " if (dialogs.length === 0 && !root) return 'closed';"
+            " if (root) dialogs.push(root);"
             " const upsellRe = /WhatsApp button|Boost (?:your )?post|Help people find your Page|Make it easier to contact you/i;"
             " const dismissRe = /^(Not now|Not Now|Maybe later|Skip|Close|No thanks)$/i;"
             " for (const d of dialogs) {"

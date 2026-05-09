@@ -1,12 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh:*)", "Bash(ghq:*)", "Bash(git:*)",
-      "Bash(bun:*)", "Bash(mkdir:*)", "Bash(ln:*)",
-      "Bash(rg:*)", "Bash(date:*)", "Bash(ls:*)",
-      "Bash(*ψ/*)", "Bash(*psi/*)",
-      "Skill(learn)", "Skill(trace)", "Skill(awaken)",
-      "Skill(rrr)", "Skill(recap)", "Skill(project)"
+      "Bash(gh:*)",
+      "Bash(ghq:*)",
+      "Bash(git:*)",
+      "Bash(bun:*)",
+      "Bash(mkdir:*)",
+      "Bash(ln:*)",
+      "Bash(rg:*)",
+      "Bash(date:*)",
+      "Bash(ls:*)",
+      "Bash(*ψ/*)",
+      "Bash(*psi/*)",
+      "Skill(learn)",
+      "Skill(trace)",
+      "Skill(awaken)",
+      "Skill(rrr)",
+      "Skill(recap)",
+      "Skill(project)",
+      "Read(//home/bjgdr/dev-work/nt-tag-id-backend/**)",
+      "Bash(node scripts/create-mahanakorn-broker-api-only.js)",
+      "Bash(/home/bjgdr/.linuxbrew/bin/agent-browser click *)",
+      "Bash(mkdir -p /home/bjgdr/.claude/skills/df-code-review/references)",
+      "Bash(mkdir -p /home/bjgdr/.claude/skills/df-code-review/assets)",
+      "Bash(mkdir -p /home/bjgdr/oracle/artemis-oracle/df-code-review-workspace)",
+      "Read(//home/bjgdr/.claude/skills/**)"
     ]
   }
 }

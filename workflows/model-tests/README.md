@@ -29,12 +29,10 @@ The 16 `*_ui.json` files and the 4 original stock templates were re-uploaded to 
 
 | # | Workflow | Model | Kind | Status | Elapsed | Output |
 |---|---|---|---|---|---|---|
-| 01 | `01_sdxl_instantid_risa.json` | SDXL + InstantID | char consist. | **blocked** | — | InstantID custom-node env bug (insightface `providers=` kwarg + missing `antelopev2` model) |
 | 01b | `01b_sdxl_baseline_risa.json` | SDXL 1.0 base | T2I | **ok** | 21 s | `test_01b_sdxl_baseline_risa_00001_.png` |
 | 02 | `02_zimage_turbo_risa.json` | z_image_turbo_bf16 | T2I (4-step turbo) | **ok** | 125 s | `test_02_zimage_turbo_risa_00001_.png` |
-| 06 | `06_wan22_t2v.json` | Wan 2.2 14B high-noise T2V | T2V | queued | — | — |
-| 07 | `07_wan22_i2v_risa.json` | Wan 2.2 14B high-noise I2V + risa_body | I2V | queued | — | — |
-| 08 | `08_hunyuan_video_t2v.json` | HunyuanVideo 720p bf16 | T2V | queued | — | — |
+| 06 | `06_wan22_t2v.json` | Wan 2.2 14B high-noise T2V | T2V | **ok** | 1085 s | `test_06_wan22_t2v_00002.mp4` |
+| 07 | `07_wan22_i2v_risa.json` | Wan 2.2 14B high-noise I2V + risa_body | I2V | **ok** | 1958 s | `test_07_wan22_i2v_risa_00002.mp4` |
 | 09 | `09_liveportrait_risa_cute.json` | LivePortrait + risa_face + dance_cute1 | face anim. | **ok** | ~1 min | `liveportrait_risa_00002.mp4` |
 | 10 | `10_ltx23_t2v.json` | LTX Video 2.3 dev fp8 + distilled LoRA | T2V | queued | — | — |
 | 11 | `11_animatediff_sdxl.json` | SDXL + animatediff_sdxl_fp16 | SDXL motion | **ok** | ~3 min | `animdiff_sdxl_00002.mp4` |
@@ -42,7 +40,6 @@ The 16 `*_ui.json` files and the 4 original stock templates were re-uploaded to 
 | 16 | `16_image_upscaler_zimage.json` | Z-Image turbo | Image upscale | **queued** | — | queued ok, needs re-run solo |
 | 17 | `17_face_swap_bfs_ltx23.json` | LTX 2.3 + BFS V3 LoRA | Face swap | **blocked** | — | BFS custom node not installed |
 | 18 | `18_motion_control_sdsteady_ltx23.json` | LTX 2.3 + SDPose + SteadyDancer | I2V motion | **blocked** | — | SteadyDancer not installed |
-| 19 | `19_lipsync_latentsync.json` | LatentSync | Lip sync | **queued** | — | queued ok, needs re-run solo |
 | 20 | `20_storydiffusion_sdxl.json` | SDXL + StoryDiffusion | Character image | **blocked** | — | No SDXL checkpoint |
 
 ## Re-running
@@ -68,11 +65,6 @@ The converter pulls the live `/object_info` schema so widget slots/order match w
 
 ## Known issues
 
-- **InstantID** (`01_sdxl_instantid_risa`): `InstantIDFaceAnalysis` errors with
-  `TypeError: FaceAnalysis.__init__() got an unexpected keyword argument 'providers'`.
-  The custom node hardcodes `antelopev2` and passes `providers=` to insightface.
-  To fix: upgrade insightface / download `antelopev2` into `/data/models/insightface/models/` or patch
-  `/app/ComfyUI/custom_nodes/ComfyUI_InstantID/InstantID.py` line 217 to `provider=` (singular).
 - CLIPLoader dropdown on a slow / cached `/object_info` call may truncate to 8 items — full list includes `umt5xxl_fp16.safetensors` and types `wan`, `lumina2`, `hunyuan_image`, etc.
 
 ## Environment

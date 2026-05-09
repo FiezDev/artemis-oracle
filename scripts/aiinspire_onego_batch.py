@@ -7,6 +7,7 @@ import argparse
 import concurrent.futures
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -160,7 +161,7 @@ def protect_template_regions(path: Path) -> None:
     im.save(path)
 
 
-def run_gptimg(prompt_path: Path, output_path: Path) -> None:
+def run_gptimg(prompt_path: Path, output_path: Path, reference_images: list[Path] | None = None) -> None:
     cmd = [
         str(GPTIMG),
         "--prompt-file",
@@ -171,6 +172,8 @@ def run_gptimg(prompt_path: Path, output_path: Path) -> None:
         "1254x1254",
         "--quiet",
     ]
+    for image in reference_images or []:
+        cmd.extend(["--reference-image", str(image)])
     attempts = 0
     while True:
         attempts += 1
@@ -257,9 +260,21 @@ def run_gptimg(prompt_path: Path, output_path: Path) -> None:
         if proc.returncode == 0:
             return
         combined = f"{proc.stdout}\n{proc.stderr}".lower()
-        if attempts <= 3 and ("usage limit" in combined or "try again at" in combined):
-            print("usage limit hit; waiting 30 minutes before retry", flush=True)
-            time.sleep(30 * 60)
+        if attempts <= 10 and ("usage limit" in combined or "try again at" in combined):
+            wait_s = 30 * 60
+            m = re.search(r"try again at\s+(\d{1,2}):(\d{2})\s*([ap]m)", combined, re.I)
+            if m:
+                hour = int(m.group(1)) % 12
+                minute = int(m.group(2))
+                if m.group(3).lower().startswith("p"):
+                    hour += 12
+                now = datetime.now(BKK)
+                retry_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if retry_at <= now:
+                    retry_at += timedelta(days=1)
+                wait_s = max(60, int((retry_at - now).total_seconds()) + 60)
+            print(f"usage limit hit; waiting {wait_s}s before retry", flush=True)
+            time.sleep(wait_s)
             continue
         if attempts <= 3 and (
             "failed to lookup address information" in combined

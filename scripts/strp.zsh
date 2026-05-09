@@ -12,19 +12,33 @@ strp () {
 		"$HOME/oracle"
 	)
 
+	# Folders whose contents are flattened into the menu (the folder itself
+	# is hidden from the regular list and its children appear as a section).
+	local RG_DIR="$HOME/dev-work/RG"
+
 	local dirs=()
 	local dir_paths=()
+	local rg_count=0
 
-	# Collect folders from each scan directory
+	# RG subfolders first — listed as a dedicated section.
+	if [[ -d "$RG_DIR" ]]; then
+		for d in "$RG_DIR"/*/; do
+			[[ -d "$d" ]] || continue
+			dirs+=("$(basename "$d")")
+			dir_paths+=("$d")
+			((rg_count++))
+		done
+	fi
+
+	# Then everything else from the scan dirs, skipping RG itself.
 	for scan_dir in "${SCAN_DIRS[@]}"; do
-		if [[ -d "$scan_dir" ]]; then
-			for d in "$scan_dir"/*/; do
-				[[ -d "$d" ]] || continue
-				local name=$(basename "$d")
-				dirs+=("$name")
-				dir_paths+=("$d")
-			done
-		fi
+		[[ -d "$scan_dir" ]] || continue
+		for d in "$scan_dir"/*/; do
+			[[ -d "$d" ]] || continue
+			[[ "${d%/}" == "${RG_DIR%/}" ]] && continue
+			dirs+=("$(basename "$d")")
+			dir_paths+=("$d")
+		done
 	done
 
 	echo "Select:"
@@ -33,21 +47,51 @@ strp () {
 	echo "2) Open Zenith (coding oracle)"
 	echo "-----------------------------------"
 	local idx=3
+	local i=1
 	for folder in "${dirs[@]}"; do
 		printf "%2d) %s\n" $idx "$folder"
+		if [[ $rg_count -gt 0 && $i -eq $rg_count ]]; then
+			echo "-----------------------------------"
+		fi
 		((idx++))
+		((i++))
 	done
 	echo "-----------------------------------"
 
 	read "choice? "
 	case "$choice" in
-		1)
-			echo "Starting Artemis (system oracle)..."
-			cd "$ARTEMIS_DIR" && clother-zai --dangerously-skip-permissions
-			;;
-		2)
-			echo "Starting Zenith (coding oracle)..."
-			cd "$ZENITH_DIR" && clother-zai --dangerously-skip-permissions
+		1|2)
+			if [[ "$choice" == 1 ]]; then
+				local oracle_name="Artemis"
+				local oracle_dir="$ARTEMIS_DIR"
+			else
+				local oracle_name="Zenith"
+				local oracle_dir="$ZENITH_DIR"
+			fi
+			echo ""
+			echo "Starting $oracle_name ($oracle_dir)..."
+			echo "Select runner:"
+			echo "-----------------------------------"
+			echo "1) glm   (clother-zai --model glm-5.1 --yolo)"
+			echo "2) claude (claude --dangerously-skip-permissions)"
+			echo "3) codex  (codex --dangerously-bypass-approvals-and-sandbox)"
+			echo "-----------------------------------"
+			read "runner? "
+			case "$runner" in
+				1)
+					cd "$oracle_dir" && clother-zai --model glm-5.1 --yolo
+					;;
+				2)
+					cd "$oracle_dir" && claude --dangerously-skip-permissions
+					;;
+				3)
+					cd "$oracle_dir" && codex --dangerously-bypass-approvals-and-sandbox
+					;;
+				*)
+					echo "Invalid runner."
+					return 1
+					;;
+			esac
 			;;
 		*)
 			local folder_count=${#dirs[@]}

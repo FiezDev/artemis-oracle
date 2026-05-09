@@ -1,0 +1,23 @@
+[
+  {
+    "workflow": "saved/06_wan22_t2v.json",
+    "status": "ok",
+    "prompt_id": "fe2be681-0917-464d-9351-fbdbb24e2c75",
+    "files": [
+      [
+        "9",
+        "gifs",
+        {
+          "filename": "test_06_wan22_t2v_00002.mp4",
+          "subfolder": "",
+          "type": "output",
+          "format": "video/h264-mp4",
+          "frame_rate": 16.0,
+          "workflow": "test_06_wan22_t2v_00002.png",
+          "fullpath": "/app/ComfyUI/output/test_06_wan22_t2v_00002.mp4"
+        }
+      ]
+    ],
+    "elapsed_s": 1084.5
+  }
+]

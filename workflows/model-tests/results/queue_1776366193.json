@@ -1,0 +1,42 @@
+[
+  {
+    "path": "saved/11_animatediff_sdxl.json",
+    "prompt_id": "506d38a4-c8f5-4533-a280-516be7857eae",
+    "error": null
+  },
+  {
+    "path": "saved/09_liveportrait_risa_cute.json",
+    "prompt_id": "a8e9030a-e430-4cbf-a6f8-713220d79a64",
+    "error": null
+  },
+  {
+    "path": "saved/04_wan21_t2v.json",
+    "prompt_id": "055e095a-2160-450f-bcd6-385e3b6a3379",
+    "error": null
+  },
+  {
+    "path": "saved/05_wan21_i2v_risa.json",
+    "prompt_id": "26b417ac-534b-4cc3-a949-d690effc838a",
+    "error": null
+  },
+  {
+    "path": "saved/06_wan22_t2v.json",
+    "prompt_id": "95a941da-99d8-40b3-9bf6-26a42f434d5a",
+    "error": null
+  },
+  {
+    "path": "saved/07_wan22_i2v_risa.json",
+    "prompt_id": "6bcca136-78d8-4829-8647-885b1732e27a",
+    "error": null
+  },
+  {
+    "path": "saved/08_hunyuan_video_t2v.json",
+    "prompt_id": "69b68e10-4a87-4d64-a5a1-3e7166eb1f23",
+    "error": null
+  },
+  {
+    "path": "saved/10_ltx23_t2v.json",
+    "prompt_id": "70582e44-2062-4eb2-bff0-9f2359f83e6e",
+    "error": null
+  }
+]
