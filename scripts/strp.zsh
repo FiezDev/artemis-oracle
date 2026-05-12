@@ -100,6 +100,28 @@ _strp_enrich_row () {
 				else empty end' "$file" 2>/dev/null)"
 			cwd="$(printf '%s\n' "$both"  | awk -F'\t' '$1=="C"{print $2; exit}')"
 			name="$(printf '%s\n' "$both" | awk -F'\t' '$1=="T"{name=$2} END{print name}')"
+
+			# Untitled session — fall back to AI response, then user message.
+			# Active untitled sessions get a meaningful name from the first
+			# substantive AI text line. Sterile sessions (no AI response yet)
+			# degrade to the first non-boilerplate user message.
+			if [[ -z "$name" ]]; then
+				name="$(jq -r '
+					select(.type=="assistant")
+					| .message.content[]?
+					| select(.type=="text")
+					| .text' "$file" 2>/dev/null \
+					| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
+			fi
+			if [[ -z "$name" ]]; then
+				name="$(jq -r '
+					select(.type=="user")
+					| .message.content
+					| if type=="string" then .
+					  else .[]? | select(.type=="text" or .type=="input_text") | (.text // .content // empty)
+					  end' "$file" 2>/dev/null \
+					| awk '{sub(/^[[:space:]]+/, "")} NF && !/^</ {print; exit}' | head -c 80)"
+			fi
 			;;
 
 		codex)
@@ -127,7 +149,15 @@ _strp_enrich_row () {
 					| split("\n")[0]' "$file" 2>/dev/null \
 					| awk 'NF && !/^</ {print; exit}' | head -c 80)"
 			fi
-			# No further fallback — line below promotes "" to "(untitled)".
+			if [[ -z "$name" ]]; then
+				# Last-resort: first substantive AI output_text line.
+				name="$(jq -r '
+					select(.type=="response_item" and .payload.role=="assistant")
+					| .payload.content[]?
+					| select(.type=="output_text")
+					| .text' "$file" 2>/dev/null \
+					| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
+			fi
 			;;
 	esac
 
