@@ -127,15 +127,7 @@ _strp_enrich_row () {
 					| split("\n")[0]' "$file" 2>/dev/null \
 					| awk 'NF && !/^</ {print; exit}' | head -c 80)"
 			fi
-			if [[ -z "$name" ]]; then
-				name="$(jq -r 'select(.type=="session_meta") | .payload.timestamp' "$file" 2>/dev/null \
-					| head -n 1 | sed 's/T/ /; s/\..*$//; s/Z$//')"
-			fi
-			;;
-
-		gemini)
-			# Placeholder — extend when Gemini session format is known.
-			return 1
+			# No further fallback — line below promotes "" to "(untitled)".
 			;;
 	esac
 
@@ -148,24 +140,29 @@ _strp_enrich_row () {
 }
 
 # Top-10 enriched sessions across all CLIs, mtime-desc. Empty output if none.
+# Over-fetches 15 quick rows so the top-10 holds even if a few sessions are
+# missing recoverable cwd (e.g., brand-new sessions whose first message has
+# not been written yet).
 _strp_recent_sessions () {
 	command -v jq >/dev/null 2>&1 || return 0
 	local quick
 	quick=$( { _strp_list_claude_quick
 	           _strp_list_codex_quick
 	           _strp_list_gemini_quick
-	         } | sort -k1 -rn -t$'\t' | head -n 10 )
+	         } | sort -k1 -rn -t$'\t' | head -n 15 )
 	[[ -z "$quick" ]] && return 0
 	local mtime cli file
 	while IFS=$'\t' read -r mtime cli file; do
 		[[ -z "$mtime" ]] && continue
 		_strp_enrich_row "$mtime" "$cli" "$file"
-	done <<< "$quick"
+	done <<< "$quick" | head -n 10
 }
 
 # Render one menu line. Format: "  N) [cli ]  name             folder    Nh ago"
+# Note: $4 (file) and $7 (id) are unused here — the renderer doesn't need them
+# but the TSV contract carries them through to the picker dispatch.
 _strp_render_row () {
-	local idx="$1" mtime="$2" cli="$3" cwd="$5" name="$6"
+	local idx="$1" mtime="$2" cli="$3" _file="$4" cwd="$5" name="$6" _id="$7"
 	local age folder name_disp
 	age="$(_strp_age "$mtime") ago"
 	folder="${cwd:t}"
@@ -302,7 +299,7 @@ strp () {
 	if [[ -d "$RG_DIR" ]]; then
 		for d in "$RG_DIR"/*/; do
 			[[ -d "$d" ]] || continue
-			dirs+=("$(basename "$d")")
+			dirs+=("${${d%/}:t}")
 			dir_paths+=("$d")
 			((rg_count++))
 		done
@@ -314,15 +311,19 @@ strp () {
 		for d in "$scan_dir"/*/; do
 			[[ -d "$d" ]] || continue
 			[[ "${d%/}" == "${RG_DIR%/}" ]] && continue
-			dirs+=("$(basename "$d")")
+			dirs+=("${${d%/}:t}")
 			dir_paths+=("$d")
 		done
 	done
 
 	# v3: recent CLI sessions — compute now to decide 0) visibility.
-	local recent_rows recent_count
+	local recent_rows
+	local -a recent_arr
 	recent_rows="$(_strp_recent_sessions)"
-	recent_count=$(printf '%s' "$recent_rows" | grep -c .)
+	recent_arr=("${(@f)recent_rows}")
+	# (@f) splits on newline; a trailing empty element may sneak in.
+	[[ -z "${recent_arr[-1]:-}" ]] && recent_arr[-1]=()
+	local recent_count=${#recent_arr[@]}
 
 	echo "Select:"
 	echo "-----------------------------------"
@@ -336,7 +337,7 @@ strp () {
 	local idx=3
 	local i=1
 	for folder in "${dirs[@]}"; do
-		printf "%2d) %s\n" $idx "$folder"
+		printf "%2d) %s\n" "$idx" "$folder"
 		if [[ $rg_count -gt 0 && $i -eq $rg_count ]]; then
 			echo "-----------------------------------"
 		fi
@@ -392,9 +393,18 @@ strp () {
 			esac
 			;;
 		*)
+			# Reject empty/non-numeric input before arithmetic to avoid
+			# zsh evaluating odd strings as 0 (or worse, erroring on a space).
+			case "$choice" in
+				''|*[!0-9]*)
+					echo "Invalid selection."
+					return 1
+					;;
+			esac
+
 			local folder_count=${#dirs[@]}
 
-			if [[ "$choice" -lt 3 || "$choice" -gt $((folder_count + 2)) ]]; then
+			if (( choice < 3 || choice > folder_count + 2 )); then
 				echo "Invalid selection."
 				return 1
 			fi
