@@ -40,6 +40,140 @@ _strp_log () {
 		>> "$log_file" 2>/dev/null
 }
 
+# =============== zai-powered session naming (cached + async) ================
+#
+# When a session lacks an auto-generated title (Claude's ai-title row or
+# Codex's thread_name in session_index), we ask zai (clother-zai → GLM-5.1)
+# to read the last 20 turns and produce a 4-7 word session name. Generation
+# is async (background, ~27s per call) and cached persistently — the menu
+# never blocks. First strp run with a new untitled session shows the
+# heuristic fallback (first AI response / first user message); the zai name
+# appears on the next run.
+
+_strp_zai_cache_file () { echo "$HOME/.strp_session_names.jsonl"; }
+
+_strp_zai_cache_get () {
+	local sid="$1"
+	[[ -z "$sid" ]] && return 0
+	local cache; cache="$(_strp_zai_cache_file)"
+	[[ -f "$cache" ]] || return 0
+	jq -r --arg sid "$sid" 'select(.session_id == $sid) | .name' "$cache" 2>/dev/null | tail -n 1
+}
+
+_strp_zai_cache_put () {
+	local sid="$1" name="$2" cli="$3" file="$4"
+	[[ -z "$sid" || -z "$name" ]] && return 0
+	command -v jq >/dev/null 2>&1 || return 0
+	local cache; cache="$(_strp_zai_cache_file)"
+	local ts; ts="$(date -Iseconds 2>/dev/null || date)"
+	jq -nc \
+		--arg sid "$sid" --arg name "$name" --arg cli "$cli" --arg file "$file" --arg ts "$ts" \
+		'{session_id:$sid, name:$name, cli:$cli, file:$file, generated_at:$ts}' \
+		>> "$cache" 2>/dev/null
+}
+
+# Extract the last 20 substantive user/assistant turns as plain text.
+# Each turn is truncated to 300 chars; boilerplate <env>/<permissions> blocks
+# are stripped to keep the prompt focused on real activity.
+_strp_zai_extract_messages () {
+	local file="$1" cli="$2"
+	case "$cli" in
+		claude)
+			jq -r '
+				if .type == "user" then
+					((if (.message.content | type) == "string" then .message.content
+					  else (.message.content // []
+					        | map(select(.type=="text" or .type=="input_text") | (.text // .content // ""))
+					        | join(" "))
+					  end) | gsub("\\s+"; " ")) as $t
+					| if ($t | length) > 5 then "USER: " + $t else empty end
+				elif .type == "assistant" then
+					((.message.content // []
+					  | map(select(.type=="text") | .text)
+					  | join(" ")) | gsub("\\s+"; " ")) as $t
+					| if ($t | length) > 5 then "ASSISTANT: " + $t else empty end
+				else empty end' "$file" 2>/dev/null \
+				| awk '!/^USER: (<|\[Request)/' \
+				| tail -n 20 \
+				| awk '{print substr($0, 1, 300)}'
+			;;
+		codex)
+			jq -r '
+				if .type=="response_item" and .payload.role=="user" then
+					(((.payload.content // []) | map(select(.type=="input_text") | .text) | join(" ")) | gsub("\\s+"; " ")) as $t
+					| if ($t | length) > 5 then "USER: " + $t else empty end
+				elif .type=="response_item" and .payload.role=="assistant" then
+					(((.payload.content // []) | map(select(.type=="output_text") | .text) | join(" ")) | gsub("\\s+"; " ")) as $t
+					| if ($t | length) > 5 then "ASSISTANT: " + $t else empty end
+				else empty end' "$file" 2>/dev/null \
+				| awk '!/^USER: </' \
+				| tail -n 20 \
+				| awk '{print substr($0, 1, 300)}'
+			;;
+	esac
+}
+
+# Synchronous: call zai with last-20 transcript, return clean name, cache it.
+# Designed to be invoked from a backgrounded subshell so the menu never blocks.
+_strp_zai_generate () {
+	local cli="$1" file="$2" sid="$3"
+	command -v clother-zai >/dev/null 2>&1 || return 1
+	[[ -z "$sid" ]] && return 1
+
+	# Atomic lock so concurrent strp invocations don't double-spend on the
+	# same session. mkdir is the classic POSIX atomic lock.
+	local lockdir="/tmp/strp_zai.${sid}.lock"
+	mkdir "$lockdir" 2>/dev/null || return 0
+
+	local msgs
+	msgs="$(_strp_zai_extract_messages "$file" "$cli")"
+	if [[ -z "$msgs" ]]; then
+		rmdir "$lockdir" 2>/dev/null
+		return 1
+	fi
+
+	local prompt
+	prompt="Read the activity below from a coding-CLI session and output a single short title (4 to 7 words) that captures the user's main goal in this session.
+
+Rules:
+- Output ONLY the title.
+- No quotes, no asterisks, no markdown, no \"Title:\" / \"Name:\" prefix.
+- Do not end with a period.
+
+Activity:
+$msgs"
+
+	local name
+	# --no-session-persistence keeps this naming job from creating its own
+	# session file, which strp would otherwise pick up and try to name
+	# (feedback loop). Required since clother-zai → claude CLI persists by default.
+	name="$(clother-zai -p --no-session-persistence --model glm-5.1 "$prompt" 2>/dev/null \
+		| awk 'NF {print; exit}' \
+		| tr -d '"`*' \
+		| sed -E 's/^[[:space:]]*(Title|Name|Session)[[:space:]]*:[[:space:]]*//I' \
+		| sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:punct:]]+$//' \
+		| head -c 80)"
+
+	rmdir "$lockdir" 2>/dev/null
+
+	if [[ -n "$name" ]]; then
+		_strp_zai_cache_put "$sid" "$name" "$cli" "$file"
+		printf '%s\n' "$name"
+		return 0
+	fi
+	return 1
+}
+
+# Kick off background zai generation for a session, disowned so strp can exit.
+# Skips silently if zai binary is missing, no session id, or already cached.
+_strp_zai_queue () {
+	local cli="$1" file="$2" sid="$3"
+	[[ -z "$sid" ]] && return 0
+	command -v clother-zai >/dev/null 2>&1 || return 0
+	[[ -n "$(_strp_zai_cache_get "$sid")" ]] && return 0
+	( _strp_zai_generate "$cli" "$file" "$sid" >/dev/null 2>&1 ) &!
+}
+
 # _strp_age <unix_seconds> — print compact age like "3m" / "2h" / "5d" / "2w"
 _strp_age () {
 	local mtime="${1%.*}"
@@ -101,26 +235,31 @@ _strp_enrich_row () {
 			cwd="$(printf '%s\n' "$both"  | awk -F'\t' '$1=="C"{print $2; exit}')"
 			name="$(printf '%s\n' "$both" | awk -F'\t' '$1=="T"{name=$2} END{print name}')"
 
-			# Untitled session — fall back to AI response, then user message.
-			# Active untitled sessions get a meaningful name from the first
-			# substantive AI text line. Sterile sessions (no AI response yet)
-			# degrade to the first non-boilerplate user message.
+			# If no ai-title row, fall through: zai cache → heuristic AI →
+			# heuristic user; queue a background zai job so the next strp
+			# run upgrades the row from heuristic → zai-generated.
 			if [[ -z "$name" ]]; then
-				name="$(jq -r '
-					select(.type=="assistant")
-					| .message.content[]?
-					| select(.type=="text")
-					| .text' "$file" 2>/dev/null \
-					| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
-			fi
-			if [[ -z "$name" ]]; then
-				name="$(jq -r '
-					select(.type=="user")
-					| .message.content
-					| if type=="string" then .
-					  else .[]? | select(.type=="text" or .type=="input_text") | (.text // .content // empty)
-					  end' "$file" 2>/dev/null \
-					| awk '{sub(/^[[:space:]]+/, "")} NF && !/^</ {print; exit}' | head -c 80)"
+				name="$(_strp_zai_cache_get "$id")"
+				if [[ -z "$name" ]]; then
+					name="$(jq -r '
+						select(.type=="assistant")
+						| .message.content[]?
+						| select(.type=="text")
+						| .text' "$file" 2>/dev/null \
+						| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
+				fi
+				if [[ -z "$name" ]]; then
+					name="$(jq -r '
+						select(.type=="user")
+						| .message.content
+						| if type=="string" then .
+						  else .[]? | select(.type=="text" or .type=="input_text") | (.text // .content // empty)
+						  end' "$file" 2>/dev/null \
+						| awk '{sub(/^[[:space:]]+/, "")} NF && !/^</ {print; exit}' | head -c 80)"
+				fi
+				# Only queue zai when there is no ai-title (don't override
+				# Claude's own auto-generated titles).
+				_strp_zai_queue "claude" "$file" "$id"
 			fi
 			;;
 
@@ -129,34 +268,36 @@ _strp_enrich_row () {
 			id="$(jq  -r 'select(.type=="session_meta") | .payload.id'  "$file" 2>/dev/null | head -n 1)"
 			cwd="$(jq -r 'select(.type=="session_meta") | .payload.cwd' "$file" 2>/dev/null | head -n 1)"
 
-			# Name preference: thread_name (named threads) → first real user text → timestamp.
+			# Name preference: explicit thread_name → zai cache → heuristics →
+			# (untitled). Background zai job queued when no thread_name.
 			if [[ -n "$id" && -f "$HOME/.codex/session_index.jsonl" ]]; then
 				name="$(jq -r --arg id "$id" \
 					'select(.id==$id) | .thread_name' \
 					"$HOME/.codex/session_index.jsonl" 2>/dev/null | tail -n 1)"
 			fi
 			if [[ -z "$name" ]]; then
-				# First real user input_text — skip boilerplate that opens with an
-				# XML-ish tag like <environment_context>, <permissions>, etc.
-				# jq emits the first non-whitespace line per input_text; awk then
-				# picks the first one that isn't empty and doesn't start with '<'.
-				name="$(jq -r '
-					select(.type=="response_item" and .payload.role=="user")
-					| .payload.content[]?
-					| select(.type=="input_text")
-					| .text
-					| gsub("^[[:space:]]+"; "")
-					| split("\n")[0]' "$file" 2>/dev/null \
-					| awk 'NF && !/^</ {print; exit}' | head -c 80)"
-			fi
-			if [[ -z "$name" ]]; then
-				# Last-resort: first substantive AI output_text line.
-				name="$(jq -r '
-					select(.type=="response_item" and .payload.role=="assistant")
-					| .payload.content[]?
-					| select(.type=="output_text")
-					| .text' "$file" 2>/dev/null \
-					| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
+				name="$(_strp_zai_cache_get "$id")"
+				if [[ -z "$name" ]]; then
+					# First real user input_text — skip boilerplate that opens
+					# with <environment_context>, <permissions>, etc.
+					name="$(jq -r '
+						select(.type=="response_item" and .payload.role=="user")
+						| .payload.content[]?
+						| select(.type=="input_text")
+						| .text
+						| gsub("^[[:space:]]+"; "")
+						| split("\n")[0]' "$file" 2>/dev/null \
+						| awk 'NF && !/^</ {print; exit}' | head -c 80)"
+				fi
+				if [[ -z "$name" ]]; then
+					name="$(jq -r '
+						select(.type=="response_item" and .payload.role=="assistant")
+						| .payload.content[]?
+						| select(.type=="output_text")
+						| .text' "$file" 2>/dev/null \
+						| awk 'length >= 15 && /[a-zA-Z0-9]/ {print; exit}' | head -c 80)"
+				fi
+				_strp_zai_queue "codex" "$file" "$id"
 			fi
 			;;
 	esac
