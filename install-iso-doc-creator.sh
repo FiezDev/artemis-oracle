@@ -60,8 +60,14 @@ log "Validating tarball…"
 if ! tar -tzf "$TMPDIR/${ASSET}" >/dev/null 2>&1; then
     die "tarball is not a valid gzipped tar"
 fi
+# NOTE: buffer the listing into a variable rather than piping `tar | grep -q`.
+# With `set -o pipefail`, grep -q closes stdin on first match → tar gets
+# SIGPIPE (exit 141) → the pipeline status is 141 → `! pipeline` becomes 0
+# → the failure branch fires even when the file IS present. The variable
+# form avoids the pipe entirely.
+LISTING=$(tar -tzf "$TMPDIR/${ASSET}")
 for required in SKILL.md scripts/run.py scripts/config.py; do
-    if ! tar -tzf "$TMPDIR/${ASSET}" | grep -qE "(^|/)${required}$"; then
+    if ! printf '%s\n' "$LISTING" | grep -qE "(^|/)${required}$"; then
         die "required file missing from bundle: ${required}" 2
     fi
 done
