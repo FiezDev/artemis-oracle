@@ -38,9 +38,18 @@ Two-phase work in a single PR:
 
 **LIFF reference (Phase 2 design):**
 - LINE Developers LIFF docs: https://developers.line.biz/en/docs/liff/
-- Use `liff.getProfile()` on FE → POST `userId` to `/api/users/bind-line`
-- Verify the LIFF access token server-side via `POST https://api.line.me/oauth2/v2.1/verify` to confirm the userId belongs to the calling LIFF app
-- Channel ID for verification: `2009081199` (RiceGuard alert OA)
+- Use `liff.getProfile()` on FE → POST `userId` + access token to `/api/users/bind-line`
+- Channel ID: `2009081199` (RiceGuard alert OA)
+
+**LIFF prior art — DO NOT re-implement (verified 2026-05-20):**
+- `src/infrastructure/line/client.ts` already exposes a `LineClient` with:
+  - `verifyAccessToken(token: string): Promise<LineTokenVerifyResponse>` at line 87 — calls `GET https://api.line.me/oauth2/v2.1/verify?access_token=...` (the right endpoint for LIFF access tokens; the POST /verify variant is for ID tokens only — comments in the file explain the distinction)
+  - `getProfile(token: string): Promise<LineProfile>` at line 114 — calls `GET https://api.line.me/v2/profile`
+- The exported types `LineProfile`, `LineTokenVerifyResponse`, `LineIdTokenVerifyResponse` (lines 15, 35, 54) are ready to consume.
+- Your endpoint should: (1) call `client.verifyAccessToken(token)`, (2) confirm the verify response's user channel matches `LINE_CHANNEL_ID`, (3) optionally `client.getProfile(token)` if you need displayName, (4) update `users.line_user_id`. Do not add a new HTTP layer for LINE OAuth — use the existing client.
+
+**Severity-enum FE/BE coupling risk (cross-repo, flag in design doc but out of scope here):**
+- RiceGuard FE (separate repo) hardcodes `INFO | WARNING | CRITICAL`. BE migration to P-tier (`P1_CRITICAL | P2_HIGH | P3_MEDIUM | P4_LOW`) is in flight (RIC-202 already shipped P-tier enum). The LIFF-bound profile pages on FE may render alerts with stale severity strings. Note in the design doc as a follow-up ticket for Wasun; do not block on it.
 
 **Jira:** https://mobileai.atlassian.net/browse/RIC-303
 </existing_context>
@@ -50,6 +59,7 @@ Two-phase work in a single PR:
 - Existing endpoint pattern: read any Elysia route in `src/domains/` or `src/graphql/` for the project's preferred shape (likely Elysia route + Zod-or-Elysia-t schema + service function).
 - Existing test pattern: `src/test/integration/*.test.ts` for integration tests with the DB.
 - Drizzle update pattern: search for `db.update(users).set({` in the codebase to mimic exactly.
+- **LIFF client usage:** `import { LineClient, LineProfile } from '@/infrastructure/line/client';` then `const client = new LineClient(); const verified = await client.verifyAccessToken(token);`. Mirror auth-middleware tests for the pattern of mocking external HTTP calls in BE integration tests (or use a `fetch` stub if no helper exists).
 
 ## Output Format
 

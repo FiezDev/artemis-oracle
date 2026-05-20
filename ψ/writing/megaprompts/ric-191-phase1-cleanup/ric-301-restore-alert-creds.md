@@ -2,7 +2,7 @@
 
 ## Role
 
-You are a senior SRE-leaning backend engineer with prod ops authority on the RiceGuard alert system. You have SSH to the production API EC2, console access to the LINE Developers Console (channel 2009081199) and Firebase project (RiceGuard prod). You are working alone but communicate state changes clearly in writing. You understand that this ticket is a credential-recovery operation, not a code change.
+You are a senior SRE-leaning backend engineer with prod ops authority on the RiceGuard alert system. You have **AWS SSM Session Manager** access to the production API EC2 (no plain SSH from CI — see CI/CD note below), console access to the LINE Developers Console (channel 2009081199) and Firebase project (RiceGuard prod). You are working alone but communicate state changes clearly in writing. You understand that this ticket is a credential-recovery operation, not a code change.
 
 ## Objective
 
@@ -13,9 +13,15 @@ Restore the LINE channel access token, Firebase service-account credentials, and
 <existing_context>
 **Repo:** `/home/bjgdr/dev-work/RG/Rice-Guard-API` (branch `develop`)
 **Stack:** Bun + Elysia + GraphQL Yoga + Drizzle ORM + TimescaleDB + RabbitMQ + Redis + Firebase Admin + LINE Messaging API
-**Prod host:** EC2 instance running `docker compose` from `/opt/riceguard/`
-**Env file:** `/opt/riceguard/env/.env`
+**Prod host:** EC2 instance (`t4g.medium` arm64) running `docker compose` from `/opt/riceguard/`
+**Env file:** `/opt/riceguard/env/.env` (managed on host — NOT pushed from CI per `.github/workflows/README-CICD.md`)
+**Deploy model:** SSM-based (prod) / SSH-based (staging). The prod EC2's `.env` files are managed on the host, which is **why the 2026-05-06 cutover dropped these vars** — CI never had them to redeploy.
 **Audit source:** 2026-05-20 alert system audit (Boris #102 follow-up)
+
+**Prod access path (verified 2026-05-20 against `.github/workflows/README-CICD.md`):**
+- Use `aws ssm start-session --target <instance-id>` to reach the prod host. No SSH key from CI.
+- If the `riceguard-prod-cicd` IAM user is not yet provisioned (the README flags this as outstanding), the agent operating this ticket must have its own IAM credentials with `ssm:StartSession` on the riceguard-tagged EC2s.
+- Once on the host, `cd /opt/riceguard && sudo docker compose up -d --force-recreate riceguard-api`.
 
 **Audit findings:**
 

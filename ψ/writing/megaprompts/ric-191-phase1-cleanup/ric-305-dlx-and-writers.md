@@ -26,9 +26,9 @@ Out of scope (do NOT implement here): escalation worker that promotes P2 → P1 
 
 | Table | Rows | Schema present | Writer | Issue |
 |---|---|---|---|---|
-| `alert_cooldowns` | 0 | yes | none | `alert_rules.cooldown_minutes` references it; suspected in-memory cooldown only — race on container restart |
-| `alert_delivery_state` | 0 | yes | none | UNIQUE on `alert_id`, ENUM (`pending`/`sent`/`failed`) — escalation-ready, no writer |
-| `alert_access_audit` | 0 | yes | none | PDPA-driven RBAC view/ack audit — no writer |
+| `alert_cooldowns` | 0 | yes | none | `alert_rules.cooldown_minutes` references it; suspected in-memory cooldown only — race on container restart. Introduced 2026-04 in **RIC-203 S2-A**. |
+| `alert_delivery_state` | 0 | yes | none | UNIQUE on `alert_id`, ENUM (`pending`/`sent`/`failed`) — escalation-ready, no writer. Introduced 2026-04 in **RIC-222 S3-A** originally as the **LoRa ACK state machine** for offline mesh delivery. The UNIQUE(alert_id) constraint was added in **RIC-191 code-review remediation (commit `4e4906e`, HIGH 2)** specifically because at-least-once redelivery was creating duplicates. **Heads-up:** writing `pending` here from `alertService.publish()` means the row's lifecycle is shared between the cloud cron pipeline and the LoRa ACK path. Re-read `src/domains/alert/` and any LoRa code (`src/domains/alert/sla.ts`, RIC-222 commits) before designing the writer to avoid stepping on the LoRa state-machine. If the schema doesn't support both clients cleanly, STOP and report. |
+| `alert_access_audit` | 0 | yes | none | PDPA-driven RBAC view/ack audit — schema introduced in **RIC-207 S6**. `recordAlertAccess()` writer ALREADY EXISTS at `src/domains/audit/delivery-log.ts:79` (also from RIC-207 S6) — only callers are missing. |
 | `q.alert.dlx` (RabbitMQ) | ~88K dead messages once (16h stall) | n/a | no consumer | poison messages stuck silently |
 
 **Existing files to read before designing:**
@@ -172,4 +172,6 @@ After all five batches:
 - **Final cross-cutting review.** This is a large multi-file PR — `feature-dev:code-reviewer` agent across the full diff is non-negotiable before opening.
 - **Land structural; defer verification when infra blocks.** If RIC-302 / RIC-304 are still open, land the consumer-side delivery-state updates anyway and document the rebase order. Don't wait.
 - **Backport fixes to source.** If you discover the audit schema is missing a needed column (e.g., `request_id`), STOP and report — do not silently add a migration.
+- **Disconnected code is invisible code.** Past lesson (2026-04-07 RIC-159/160 retrospective): files created but never registered in GraphQL schema / DB schema / app startup are dead weight. Apply here: the DLX consumer MUST be registered in `src/consumers/mod.ts` *and* boot-time wiring in `src/index.ts` (or wherever consumers are started); same for any audit-plugin hook. Verify by reading the startup path end-to-end, not just by writing the file.
+- **at-least-once redelivery creates duplicates.** Past lesson (2026-04-27 RIC-191 code-review HIGH 2, commit `4e4906e`): the `alert_delivery_state.alert_id` UNIQUE constraint exists precisely because retries can re-enter. The publish-side INSERT must use `ON CONFLICT (alert_id) DO NOTHING` (or `DO UPDATE` if you're explicit about which fields are safe to update). The consumer-side UPDATE must be tolerant of races between consumer attempts. Do not skip the conflict handling — it is load-bearing.
 - **No `--force`, no `--no-verify`, no self-merge.** Standard rule.
