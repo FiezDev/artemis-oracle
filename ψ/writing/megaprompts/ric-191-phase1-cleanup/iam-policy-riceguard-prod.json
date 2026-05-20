@@ -1,0 +1,95 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SsmSessionOnRiceguardProdEC2s",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession",
+        "ssm:TerminateSession",
+        "ssm:ResumeSession"
+      ],
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-7:654654475577:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/Project": "riceguard",
+          "ssm:resourceTag/Env": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "SsmSessionDocuments",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession"
+      ],
+      "Resource": [
+        "arn:aws:ssm:*::document/AWS-StartSSHSession",
+        "arn:aws:ssm:*::document/AWS-StartPortForwardingSession",
+        "arn:aws:ssm:*::document/SSM-SessionManagerRunShell"
+      ]
+    },
+    {
+      "Sid": "SsmSendCommandOnRiceguardProdEC2s",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-7:654654475577:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/Project": "riceguard",
+          "ssm:resourceTag/Env": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "SsmSendCommandShellDocument",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ssm:*::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "SsmReadCommandAndSessionResults",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations",
+        "ssm:ListCommands",
+        "ssm:DescribeSessions",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ec2DescribeForInstanceLookup",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SsmParameterStoreRiceguardProd",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:GetParametersByPath"
+      ],
+      "Resource": [
+        "arn:aws:ssm:ap-southeast-7:654654475577:parameter/riceguard/prod/*"
+      ]
+    }
+  ]
+}
