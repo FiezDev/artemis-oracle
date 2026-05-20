@@ -18,10 +18,34 @@ Restore the LINE channel access token, Firebase service-account credentials, and
 **Deploy model:** SSM-based (prod) / SSH-based (staging). The prod EC2's `.env` files are managed on the host, which is **why the 2026-05-06 cutover dropped these vars** — CI never had them to redeploy.
 **Audit source:** 2026-05-20 alert system audit (Boris #102 follow-up)
 
-**Prod access path (verified 2026-05-20 against `.github/workflows/README-CICD.md`):**
-- Use `aws ssm start-session --target <instance-id>` to reach the prod host. No SSH key from CI.
-- If the `riceguard-prod-cicd` IAM user is not yet provisioned (the README flags this as outstanding), the agent operating this ticket must have its own IAM credentials with `ssm:StartSession` on the riceguard-tagged EC2s.
+**Prod access path (verified 2026-05-20 against handover docs + `.github/workflows/README-CICD.md`):**
+- The actual prod EC2 (the one running `api.riceguard.ai` behind ALB target group `tg-api-prod-prod`) has **no public IP and no SSH ingress** per `riceguard-prod-handover/06-runbook.md:5`. SSM Session Manager is the only way in.
+- Use `aws ssm start-session --target <instance-id>` to reach the prod host. The instance carries `IAMRole-riceguard-prod` (`AmazonSSMManagedInstanceCore` managed + inline S3 backups policy).
+- If the `riceguard-prod-cicd` IAM user is not yet provisioned (the CI README flags this as outstanding), the agent operating this ticket must have its own IAM credentials with `ssm:StartSession` on the riceguard-tagged EC2s.
 - Once on the host, `cd /opt/riceguard && sudo docker compose up -d --force-recreate riceguard-api`.
+
+**Where the missing credential values are NOT (verified 2026-05-20 cred hunt):**
+
+| Source | Result |
+|---|---|
+| Staging EC2 `rice-guard-staging` container env | `LINE_CHANNEL_ACCESS_TOKEN` and `LINE_CHANNEL_SECRET` are **empty strings** (hardcoded `LINE_*=` in `docker-compose.ec2.yml`); no Firebase or SMS vars at all |
+| Staging EC2 `/home/ec2-user/rice-guard-api/.env` | Placeholder `your-...-here` values for LINE; no Firebase or SMS keys present |
+| `rice-guard-production` container on staging EC2 (local-prod stub) | Same empty-string pattern as staging |
+| GitHub Secrets (`PROD_*`) | Prefix does not exist; zero secrets |
+| GitHub Secrets (unprefixed legacy names like `LINE_CHANNEL_ACCESS_TOKEN`) | All deleted in cutover commit `4e61606` (`ci: ... drop legacy deploy.yml`) |
+| GitHub Secrets (`STAGING_LINE_*`) | 3 secrets exist, created 2026-05-06 09:10 UTC. **No current workflow references them — orphaned.** May contain real values but only verifiable by a temp workflow_dispatch (skipped by reviewer per auto-mode block) |
+| Handover zip `riceguard-prod-handover-v1.1.zip` | Documentation only, no creds. Confirms "no central secret manager; creds in `.env` on each EC2 disk" |
+| Firebase + SMS GitHub Secrets | **None exist in any prefix** — they were never migrated to GitHub from the original deploy.yml era |
+
+**Practical conclusion for the executor:**
+
+1. **Step 0 — quick check before rotating anything:** SSM into the actual prod EC2 (the one behind `api.riceguard.ai`) and inspect `/opt/riceguard/env/.env`. The audit says the values were *missing* in the container env, but the file on disk may still have them — the env-drop may have been a docker-compose wiring break rather than a file deletion. If the on-disk file has real values, the fix is to make sure compose loads them; no rotation needed.
+2. **Step 1 (if file is empty/missing) — try the orphaned STAGING_LINE_* GitHub Secrets:** they were created on cutover day with the original deploy.yml's secret names. Worth verifying via a temp `workflow_dispatch` that prints `echo "len=${#TOKEN}"`. If they're real, transplant to prod's `.env` and skip LINE rotation.
+3. **Step 2 (if both above are dry) — rotate fresh from vendor consoles:**
+   - LINE: Developers Console → channel `2009081199` → issue new long-lived access token (v2.1)
+   - Firebase: Project Settings → Service Accounts → Generate new private key → extract `project_id`, `client_email`, `private_key`
+   - SMS: locate the original vendor (Thai SOAP gateway per Boris #102 / RIC-191) and re-request credentials. **This vendor relationship is the highest-friction part of the ticket** — start it first.
+4. **Step 3 — once values are in hand:** write them to `/opt/riceguard/env/.env` on the prod EC2, `docker compose up -d --force-recreate riceguard-api`, then run the verification probes from the "Success Criteria" section below.
 
 **Audit findings:**
 
