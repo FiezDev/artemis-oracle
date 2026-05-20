@@ -98,15 +98,15 @@
 </div>
 
 <div class="tldr">
-  <h3>TL;DR — read this first</h3>
-  <p>You handed me 5 Jira tickets (<strong>RIC-301 → RIC-305</strong>) — production fixes for the RiceGuard alert system after a 2026-05-06 cutover dropped credentials and exposed silent-skip bugs.</p>
-  <p><strong>What got done:</strong></p>
+  <h3>TL;DR — final state</h3>
+  <p>5 Jira tickets (<strong>RIC-301 → RIC-305</strong>) — production fixes for the RiceGuard alert system after the 2026-05-06 prod cutover.</p>
+  <p><strong>Where we landed (2026-05-20):</strong></p>
   <ul>
-    <li>✅ Wrote 5 <strong>mega-prompts</strong> (one per ticket) — ready to hand to another Claude Code session</li>
-    <li>✅ <strong>Executed 2 of them myself</strong> as a smoke test — RIC-302 + RIC-304 PRs are open, awaiting your merge</li>
-    <li>✅ Researched git history + Oracle memory and <strong>backported real findings</strong> into the unexecuted prompts so the executor doesn't re-invent the wheel</li>
+    <li>✅ <strong>4 of 5 tickets shipped to <code>develop</code></strong> — PRs <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23">#23</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/24">#24</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/25">#25</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/26">#26</a> all merged</li>
+    <li>🔴 <strong>RIC-301 (credentials) remaining</strong> — needs you, not code: issue fresh LINE token, download Firebase service account, contact SMS vendor. Confirmed via direct SSM into prod that the .env has only placeholders, not lost real values</li>
+    <li>📦 5 mega-prompts archived at <code>ψ/writing/megaprompts/ric-191-phase1-cleanup/</code> with full historical context for any future re-runs or hand-offs</li>
   </ul>
-  <p><strong>What you do next:</strong> review &amp; merge <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23">PR #23</a> + <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/24">PR #24</a>, then open a fresh Claude Code session and paste one of the remaining 3 prompts when you're ready (RIC-301 → RIC-303 → RIC-305).</p>
+  <p><strong>Next move:</strong> when you have vendor values in hand, SSM into <code>i-0aa46f0468a9fd61e</code> and edit <code>/opt/riceguard/env/.env</code>. The RIC-301 prompt has the full verification sequence baked in.</p>
 </div>
 
 <div class="toc">
@@ -183,11 +183,11 @@
 </table>
 
 <!-- ============================================================ -->
-<h2 id="prs">2. PRs already open (action needed)</h2>
+<h2 id="prs">2. All PRs shipped (4 of 4 merged)</h2>
 
 <div class="panel panel-good">
-  <h3 style="margin-top:0;">Two PRs are live and waiting on you</h3>
-  <p>I executed the two lowest-risk tickets to validate my own prompts. Both passed typecheck cleanly. Tests weren't run locally because docker port 5432 collides with your running <code>qone-postgres</code> — the reviewer should bring up the test DB to run them.</p>
+  <h3 style="margin-top:0;">Four PRs merged into <code>develop</code> 2026-05-20</h3>
+  <p>All structural and code work for RIC-302, RIC-303 (Phase 1 + Phase 2 design), RIC-304, and RIC-305 is now on <code>develop</code>. The only piece outside this PR train is RIC-301 (vendor credential issuance — see Section 5).</p>
 </div>
 
 <table>
@@ -197,26 +197,45 @@
       <th>Ticket</th>
       <th>Status</th>
       <th>Diff</th>
-      <th>Verification gap</th>
+      <th>Merged at</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23"><strong>#23</strong></a></td>
       <td>RIC-302 (LINE silent-skip)</td>
-      <td><span class="tag tag-pending">Open</span></td>
+      <td><span class="tag tag-done">Merged</span></td>
       <td>+2 src · +113 test</td>
-      <td>Tests not run locally (port conflict)</td>
+      <td>12:47 UTC</td>
     </tr>
     <tr>
       <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/24"><strong>#24</strong></a></td>
       <td>RIC-304 (FCM silent-skip)</td>
-      <td><span class="tag tag-pending">Open</span></td>
+      <td><span class="tag tag-done">Merged</span></td>
       <td>+3 src · +146 test</td>
-      <td>Tests not run locally (port conflict)</td>
+      <td>12:47 UTC</td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/25"><strong>#25</strong></a></td>
+      <td>RIC-303 (line_user_id seed + LIFF design)</td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td>+155 script · +157 design doc</td>
+      <td>13:09 UTC</td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/26"><strong>#26</strong></a></td>
+      <td>RIC-305 (DLX + audit wiring)</td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td>+87 DLX · +28 audit calls · +12 wiring</td>
+      <td>13:10 UTC</td>
     </tr>
   </tbody>
 </table>
+
+<div class="panel panel-info">
+  <h4 style="margin-top:0;">Integration-test verification gap (informational)</h4>
+  <p>Bun integration tests in #23, #24, #25 weren't run locally because the test DB at port 5432 collides with your running <code>qone-postgres</code>. <code>npx tsc --noEmit</code> was green on all four. The integration tests will exercise on the next CI run that has Postgres available; if any fail, follow-up PRs can fix.</p>
+</div>
 
 <div class="panel panel-warn">
   <strong>How to run the tests yourself before merging:</strong>

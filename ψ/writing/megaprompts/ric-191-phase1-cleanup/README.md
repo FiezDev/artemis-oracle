@@ -64,11 +64,12 @@ RIC-301 unblocks RIC-303 end-to-end verification. RIC-302 and RIC-304 are indepe
 
 ## Execution log
 
-- **2026-05-20** — RIC-302 implemented on branch `ric-302-line-silent-skip`, PR #23 opened against `develop`: https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23
-   - Net diff: +2 lines in `line.consumer.ts`, +113-line integration test
-   - Full `npx tsc --noEmit --skipLibCheck` clean
-   - Test execution deferred to reviewer (docker-compose.test.yml port conflict)
-   - Findings backported into prompts above
+- **2026-05-20** — All four code/structural tickets shipped to `develop`:
+   - PR #23 (RIC-302 LINE silent-skip) merged 12:47 UTC
+   - PR #24 (RIC-304 FCM silent-skip) merged 12:47 UTC
+   - PR #25 (RIC-303 seed script + LIFF design doc) merged 13:09 UTC — discovered the LIFF BE endpoint already exists (`Mutation.linkLineAccount`)
+   - PR #26 (RIC-305 DLX consumer + audit wiring) merged 13:10 UTC — two scope corrections recorded (cooldown writer not needed; `alert_delivery_state` is the LoRa ACK table, not generic delivery state)
+   - RIC-301 remaining: confirmed via direct SSM into `i-0aa46f0468a9fd61e` that prod's `.env` has only placeholders. Fresh-issuance task pending vendor calls (LINE Console, Firebase Console, SMS vendor).
 
 ---
 
