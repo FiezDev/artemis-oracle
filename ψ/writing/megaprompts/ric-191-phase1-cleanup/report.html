@@ -362,27 +362,41 @@ bun test src/consumers/fcm.consumer.test.ts</code></pre>
 </div>
 
 <div class="panel panel-bad">
-  <h4 style="margin-top:0;">🔑 RIC-301 credential-hunt outcome (2026-05-20)</h4>
-  <p>We hoped staging-side values could be transplanted to prod. <strong>They cannot — staging never had real LINE/Firebase/SMS credentials.</strong> Findings:</p>
+  <h4 style="margin-top:0;">🔑 RIC-301 credential-hunt outcome — definitive (SSM'd into prod 2026-05-20)</h4>
+  <p><strong>Narrative correction.</strong> The audit framed this as "creds dropped in cutover" but inspection of the actual prod EC2 (<code>i-0aa46f0468a9fd61e</code> via SSM) shows otherwise:</p>
+  <ul>
+    <li>Prod <code>.env</code> was generated <strong>2026-05-05</strong> (one day BEFORE the cutover).</li>
+    <li>Its leading comments literally say <code># LINE messaging — copied from staging</code>.</li>
+    <li>Staging has only placeholders → prod inherited placeholders.</li>
+    <li><strong>Prod has never had working LINE/Firebase/SMS credentials.</strong></li>
+  </ul>
+  <h4>What's actually on prod's <code>/opt/riceguard/env/.env</code>:</h4>
   <table>
-    <thead><tr><th>Source</th><th>LINE</th><th>Firebase</th><th>SMS</th></tr></thead>
+    <thead><tr><th>Variable</th><th>Length</th><th>Prefix</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Staging container env</td><td>❌ empty string</td><td>❌ not set</td><td>❌ not set</td></tr>
-      <tr><td>Staging host <code>.env</code></td><td>⚠️ placeholder <code>your...</code></td><td>❌ not in file</td><td>❌ not in file</td></tr>
-      <tr><td><code>rice-guard-production</code> on staging EC2</td><td>❌ empty string</td><td>❌ not set</td><td>❌ not set</td></tr>
-      <tr><td>GitHub Secrets <code>PROD_*</code></td><td>❌ prefix doesn't exist</td><td>❌ prefix doesn't exist</td><td>❌ prefix doesn't exist</td></tr>
-      <tr><td>GitHub Secrets unprefixed (legacy)</td><td>❌ deleted in cutover</td><td>❌ deleted</td><td>❌ deleted</td></tr>
-      <tr><td>GitHub Secrets <code>STAGING_LINE_*</code></td><td>⚠️ 3 orphaned secrets exist (may be real, can't verify via API)</td><td>❌ never created</td><td>❌ never created</td></tr>
-      <tr><td>Handover zip</td><td>❌ docs only</td><td>❌ docs only</td><td>❌ docs only</td></tr>
-      <tr><td><strong>Actual prod EC2 disk</strong> (only SSM)</td><td><strong>🔍 unchecked</strong></td><td><strong>🔍 unchecked</strong></td><td><strong>🔍 unchecked</strong></td></tr>
+      <tr><td><code>LINE_CHANNEL_ID</code></td><td>10 chars</td><td><code>200...</code></td><td>✅ Matches documented channel <code>2009081199</code> — real</td></tr>
+      <tr><td><code>LINE_CHANNEL_SECRET</code></td><td>32 chars</td><td><code>CHA...</code></td><td>⚠️ Same prefix as the token below — almost certainly placeholder</td></tr>
+      <tr><td><code>LINE_CHANNEL_ACCESS_TOKEN</code></td><td>31 chars</td><td><code>CHA...</code></td><td>❌ Live-tested against LINE API → HTTP 401. Real tokens are ~170+ chars. Definitively a <code>CHANGE_ME_...</code>-style placeholder.</td></tr>
+      <tr><td><code>FIREBASE_*</code> (any)</td><td colspan="2">—</td><td>❌ Not in the file at all</td></tr>
+      <tr><td><code>SMS_*</code> (any)</td><td colspan="2">—</td><td>❌ Not in the file at all</td></tr>
+      <tr><td><code>FCM_*</code> / <code>GOOGLE_*</code> / <code>ALERT_PHONE_NUMBER</code></td><td colspan="2">—</td><td>❌ Not in the file at all</td></tr>
     </tbody>
   </table>
-  <p><strong>Practical path forward</strong> (now baked into the RIC-301 prompt):</p>
+  <p><strong>RIC-301 is a fresh-issuance task, not a restoration task.</strong> Simpler than originally framed — no archaeology, just vendor work.</p>
+  <h4>Practical sequence (baked into the prompt):</h4>
   <ol>
-    <li><strong>Step 0:</strong> SSM into actual prod EC2, inspect <code>/opt/riceguard/env/.env</code> directly. The 2026-05-06 cutover may have broken compose wiring rather than deleted the file.</li>
-    <li><strong>Step 1:</strong> If on-disk file is dry, verify the orphaned <code>STAGING_LINE_*</code> GitHub Secrets via a temp <code>workflow_dispatch</code> printing length only.</li>
-    <li><strong>Step 2:</strong> If still dry, rotate fresh — LINE Console (channel <code>2009081199</code>), Firebase service-account, and locate the original Thai SOAP SMS vendor. <strong>The SMS vendor relationship is the highest-friction part — start it first.</strong></li>
+    <li><strong>Verify</strong> <code>LINE_CHANNEL_ID</code> + <code>LINE_CHANNEL_SECRET</code> against LINE Developers Console for channel <code>2009081199</code>. Channel ID looks real; secret may also be real.</li>
+    <li><strong>Issue fresh LINE long-lived access token</strong> (v2.1, ~170+ chars). Write to prod's <code>.env</code> via SSM. Restart container.</li>
+    <li><strong>Add Firebase service-account creds</strong>: Firebase Console → Service Accounts → new key. Mind the <code>\n</code> escaping for <code>FIREBASE_PRIVATE_KEY</code>.</li>
+    <li><strong>Add SMS gateway creds</strong>: locate the original Thai SOAP gateway vendor (per Boris #102 / <code>nt-tag-id-backend</code>). <strong>Highest-friction step — start the vendor contact FIRST</strong>, in parallel with everything else.</li>
+    <li><strong>Verify</strong>: 3 probes (LINE bot/info HTTP 200, Firebase init log line, SMS gateway log line), then 30-min observation.</li>
   </ol>
+  <p><strong>Captured artifacts</strong> for the executor:</p>
+  <ul>
+    <li>Prod EC2 instance ID: <code>i-0aa46f0468a9fd61e</code> (private IP <code>10.40.10.212</code>, behind ALB <code>tg-api-prod-prod</code>)</li>
+    <li>AWS account: <code>654654475577</code> · Region: <code>ap-southeast-7</code></li>
+    <li>IAM user with SSM access: <code>ittipol-aws</code> (creds in <code>/home/bjgdr/secret/awskeypair/</code>)</li>
+  </ul>
 </div>
 
 <div class="panel panel-warn">

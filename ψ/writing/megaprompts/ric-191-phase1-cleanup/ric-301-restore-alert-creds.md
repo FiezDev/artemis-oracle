@@ -24,28 +24,52 @@ Restore the LINE channel access token, Firebase service-account credentials, and
 - If the `riceguard-prod-cicd` IAM user is not yet provisioned (the CI README flags this as outstanding), the agent operating this ticket must have its own IAM credentials with `ssm:StartSession` on the riceguard-tagged EC2s.
 - Once on the host, `cd /opt/riceguard && sudo docker compose up -d --force-recreate riceguard-api`.
 
-**Where the missing credential values are NOT (verified 2026-05-20 cred hunt):**
+**Definitive credential-hunt findings (verified 2026-05-20 against the actual prod EC2 `i-0aa46f0468a9fd61e` via SSM Session Manager — instance name `Rice Guard Prod API`, region `ap-southeast-7`):**
+
+**Narrative correction:** The audit's framing ("creds were dropped in cutover") is partially wrong. Reality:
+
+- The prod `.env` was generated `2026-05-05T10:43:40+07:00` (one day **before** the cutover).
+- Its leading comments explicitly say `# LINE messaging — copied from staging` and `# AWS (kept from staging — same SQS region until prod has its own)`.
+- Staging has never had real LINE/Firebase/SMS credentials.
+- Therefore prod inherited **placeholders**, not real values that later "got dropped."
+
+**Specifically, on prod's `/opt/riceguard/env/.env` (size 2910 bytes, mode 600, last touched 2026-05-12):**
+
+| Variable | Value characteristic | Verdict |
+|---|---|---|
+| `LINE_CHANNEL_ID` | 10 chars, prefix `200...` | Matches documented channel `2009081199` — likely real |
+| `LINE_CHANNEL_SECRET` | 32 chars, prefix `CHA...` | Almost certainly placeholder (`CHA` prefix shared with the token below) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | 31 chars, prefix `CHA...` | **Confirmed placeholder.** Live-tested against `https://api.line.me/v2/bot/info` → `HTTP 401 "Authentication failed."` Real LINE long-lived tokens are ~170+ chars; 31 chars = `CHANGE_ME_..._PLACEHOLDER` shape. |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | **Absent from `.env` entirely** | Never configured on this prod environment |
+| `SMS_USER`, `SMS_PASS`, `SMS_URL`, `SMS_SENDER` | **Absent from `.env` entirely** | Never configured |
+| `FCM_*`, `GOOGLE_*`, `ALERT_PHONE_NUMBER` | **Absent from `.env` entirely** | Never configured |
+
+**Cross-checked sources that have NO real values either:**
 
 | Source | Result |
 |---|---|
-| Staging EC2 `rice-guard-staging` container env | `LINE_CHANNEL_ACCESS_TOKEN` and `LINE_CHANNEL_SECRET` are **empty strings** (hardcoded `LINE_*=` in `docker-compose.ec2.yml`); no Firebase or SMS vars at all |
-| Staging EC2 `/home/ec2-user/rice-guard-api/.env` | Placeholder `your-...-here` values for LINE; no Firebase or SMS keys present |
-| `rice-guard-production` container on staging EC2 (local-prod stub) | Same empty-string pattern as staging |
-| GitHub Secrets (`PROD_*`) | Prefix does not exist; zero secrets |
-| GitHub Secrets (unprefixed legacy names like `LINE_CHANNEL_ACCESS_TOKEN`) | All deleted in cutover commit `4e61606` (`ci: ... drop legacy deploy.yml`) |
-| GitHub Secrets (`STAGING_LINE_*`) | 3 secrets exist, created 2026-05-06 09:10 UTC. **No current workflow references them — orphaned.** May contain real values but only verifiable by a temp workflow_dispatch (skipped by reviewer per auto-mode block) |
-| Handover zip `riceguard-prod-handover-v1.1.zip` | Documentation only, no creds. Confirms "no central secret manager; creds in `.env` on each EC2 disk" |
-| Firebase + SMS GitHub Secrets | **None exist in any prefix** — they were never migrated to GitHub from the original deploy.yml era |
+| Staging EC2 `rice-guard-staging` container env | `LINE_*` are empty strings; no Firebase or SMS vars |
+| Staging EC2 `/home/ec2-user/rice-guard-api/.env` | `your-...-here` placeholders for LINE; nothing else |
+| GitHub Secrets `PROD_*` prefix | Does not exist |
+| GitHub Secrets unprefixed (legacy `LINE_CHANNEL_ACCESS_TOKEN` etc.) | All deleted in cutover commit `4e61606` |
+| GitHub Secrets `STAGING_LINE_*` | 3 secrets exist (created 2026-05-06 09:10 UTC); no current workflow references them; values unverifiable without a temp `workflow_dispatch` |
+| Handover zip `riceguard-prod-handover-v1.1.zip` | Documentation only; explicitly states "no central secret manager" |
+| `.env.bak.1778210615` (prod, dated 2026-05-08) | Same placeholder values — no regression to roll back to |
 
-**Practical conclusion for the executor:**
+**This means RIC-301 is a fresh-issuance task, not a restoration task.**
 
-1. **Step 0 — quick check before rotating anything:** SSM into the actual prod EC2 (the one behind `api.riceguard.ai`) and inspect `/opt/riceguard/env/.env`. The audit says the values were *missing* in the container env, but the file on disk may still have them — the env-drop may have been a docker-compose wiring break rather than a file deletion. If the on-disk file has real values, the fix is to make sure compose loads them; no rotation needed.
-2. **Step 1 (if file is empty/missing) — try the orphaned STAGING_LINE_* GitHub Secrets:** they were created on cutover day with the original deploy.yml's secret names. Worth verifying via a temp `workflow_dispatch` that prints `echo "len=${#TOKEN}"`. If they're real, transplant to prod's `.env` and skip LINE rotation.
-3. **Step 2 (if both above are dry) — rotate fresh from vendor consoles:**
-   - LINE: Developers Console → channel `2009081199` → issue new long-lived access token (v2.1)
-   - Firebase: Project Settings → Service Accounts → Generate new private key → extract `project_id`, `client_email`, `private_key`
-   - SMS: locate the original vendor (Thai SOAP gateway per Boris #102 / RIC-191) and re-request credentials. **This vendor relationship is the highest-friction part of the ticket** — start it first.
-4. **Step 3 — once values are in hand:** write them to `/opt/riceguard/env/.env` on the prod EC2, `docker compose up -d --force-recreate riceguard-api`, then run the verification probes from the "Success Criteria" section below.
+**Practical sequence for the executor:**
+
+1. **Step 0 — verify LINE_CHANNEL_ID + LINE_CHANNEL_SECRET against the LINE Developers Console** for channel `2009081199`. The `200...`-prefixed channel ID is almost certainly real (matches Boris #102 docs); the secret may also be real. If both are real, only the access token needs rotation. If the secret is also placeholder, rotate the channel secret too.
+2. **Step 1 — issue a fresh LINE long-lived access token (v2.1)** via the LINE Developers Console → channel `2009081199`. Token should be 170+ chars. Write to `/opt/riceguard/env/.env` on the prod EC2 (`i-0aa46f0468a9fd61e`) over SSM, then `docker compose up -d --force-recreate riceguard-api`.
+3. **Step 2 — add Firebase service-account credentials** to prod's `.env`. Firebase Console → Project Settings → Service Accounts → Generate new private key (JSON). Extract `project_id`, `client_email`, `private_key`. Pay attention to the `\n` escaping requirement noted in `src/infrastructure/firebase/client.ts`.
+4. **Step 3 — add SMS gateway credentials.** Locate the original Thai SOAP gateway vendor (per Boris #102 / `nt-tag-id-backend src/controllers/send_sms.controller.js`). **This is the highest-friction step — start the vendor contact first**, in parallel with Steps 1–2, so the SMS path isn't blocking everything else.
+5. **Step 4 — once all values land:** restart, verify with the three probes in "Success Criteria" below, then 30-min observation.
+
+**Useful artifacts captured during the cred hunt (in your local `/home/bjgdr/secret/` per privacy convention):**
+- The prod EC2 instance ID: `i-0aa46f0468a9fd61e` (private IP `10.40.10.212`, behind ALB target group `tg-api-prod-prod`)
+- AWS account: `654654475577`, region: `ap-southeast-7`
+- IAM user that has SSM access from a local shell: `ittipol-aws` (the same one being used by the executor of this ticket)
 
 **Audit findings:**
 
