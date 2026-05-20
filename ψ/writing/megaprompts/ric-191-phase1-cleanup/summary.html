@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RIC-191 Phase 1 Cleanup — Final Summary (2026-05-20)</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --code-bg: #0d1117;
+    --done-tag: #1a7f37;
+    --pending-tag: #1f6feb;
+    --blocked-tag: #cf222e;
+    --warn-tag: #9a6700;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+  }
+  h1 { color: #fff; font-size: 1.7rem; margin: 0 0 4px; }
+  h2 { color: #fff; font-size: 1.25rem; margin: 36px 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  h3 { color: #fff; font-size: 1.05rem; margin: 22px 0 10px; }
+  h4 { color: var(--text); font-size: .95rem; margin: 16px 0 8px; }
+  p { margin: 8px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: .85rem; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; color: #ffa657; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; max-height: 540px; }
+  pre code { background: transparent; padding: 0; color: var(--text); font-size: .82rem; }
+
+  .subtitle { color: var(--text-dim); margin-top: 0; font-size: .95rem; }
+  .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 8px; border-radius: 10px; font-size: .8rem; margin-right: 6px; }
+  .meta-bar { color: var(--text-dim); font-size: .85rem; margin-top: 6px; }
+
+  .hero { background: var(--panel-2); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 18px 22px; border-radius: 6px; margin: 22px 0 32px; }
+  .hero h3 { margin-top: 0; }
+  .hero p:last-child { margin-bottom: 0; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 12px 0; }
+  .panel-good { border-left: 4px solid var(--good); }
+  .panel-warn { border-left: 4px solid var(--warn); }
+  .panel-bad { border-left: 4px solid var(--bad); }
+  .panel-info { border-left: 4px solid var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: #fff; font-weight: 600; }
+  tr:hover td { background: var(--panel-2); }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #fff; white-space: nowrap; }
+  .tag-done { background: var(--done-tag); }
+  .tag-pending { background: var(--pending-tag); }
+  .tag-blocked { background: var(--blocked-tag); }
+  .tag-warn { background: var(--warn-tag); }
+
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+
+  .copy-hint { color: var(--text-dim); font-size: .8rem; text-align: right; margin-top: 4px; font-style: italic; }
+  .kbd { background: var(--code-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; font-family: monospace; font-size: .82rem; }
+
+  .footer { color: var(--text-dim); text-align: center; font-size: .85rem; margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  @media print {
+    body { background: white; color: black; max-width: 100%; }
+    pre { background: #f6f8fa; color: black; max-height: none; }
+    .panel, .hero, table th { background: #f6f8fa !important; color: black !important; }
+    h1, h2, h3, h4 { color: black; }
+    code { background: #eee; color: #b04545; }
+    a { color: #0366d6; }
+  }
+</style>
+</head>
+<body>
+
+<h1>RIC-191 Phase 1 Cleanup — Final Summary</h1>
+<p class="subtitle">2026-05-20 · alert system production fixes complete except vendor work</p>
+<div class="meta-bar">
+  <span class="pill">Repo: <code>Rice-Guard-API</code></span>
+  <span class="pill">Branch: <code>develop</code> (4 PRs merged)</span>
+  <span class="pill">Account: <code>654654475577</code></span>
+  <span class="pill">Region: <code>ap-southeast-7</code></span>
+</div>
+
+<!-- ============================================================ -->
+<div class="hero">
+  <h3>Where we are right now</h3>
+  <p><strong>4 of 5 tickets shipped today.</strong> All code and structural work is on <code>develop</code>. The remaining ticket — <strong>RIC-301</strong> — isn't code; it's vendor work plus one IAM-policy ask of your AWS admin.</p>
+  <p><strong>Two things you do next:</strong></p>
+  <ol>
+    <li>Send the JSON policy in <a href="#iam-policy">Section 4</a> to your AWS admin and ask them to attach it to a new <code>riceguard-prod-cicd</code> IAM user (or to <code>ittipol-aws</code> if you'd rather use your personal user).</li>
+    <li>Contact the three vendors (LINE Console, Firebase Console, SMS gateway) to get the missing credentials. See <a href="#ric-301">Section 3</a> for the exact steps once you have them.</li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="done">1. What got done today</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Ticket</th>
+      <th>Status</th>
+      <th>PR</th>
+      <th>What it does</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>RIC-302</strong></td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23">#23</a></td>
+      <td>LINE consumer: 2 silent-skip paths now write <code>failed</code> rows to <code>alert_delivery_log</code> with discriminating error messages</td>
+    </tr>
+    <tr>
+      <td><strong>RIC-303</strong></td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/25">#25</a></td>
+      <td>Seed script + LIFF design doc. <em>Surprise:</em> the LIFF BE mutation already exists — no new endpoint needed.</td>
+    </tr>
+    <tr>
+      <td><strong>RIC-304</strong></td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/24">#24</a></td>
+      <td>FCM consumer: 3 silent-skip paths now logged (2 as <code>failed</code>, 1 as <code>skipped_pref</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>RIC-305</strong></td>
+      <td><span class="tag tag-done">Merged</span></td>
+      <td><a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/26">#26</a></td>
+      <td>DLX consumer + PDPA audit wiring in 5 alert-namespace resolvers. <em>Two scope corrections</em> documented in the PR — cooldown writer wasn't needed, <code>alert_delivery_state</code> is the LoRa ACK table not a generic delivery table.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="panel panel-good">
+  <h4 style="margin-top:0;">Bonus deliverables (in <code>artemis-oracle/ψ/writing/megaprompts/ric-191-phase1-cleanup/</code>)</h4>
+  <ul>
+    <li><strong>5 mega-prompts</strong> (one per ticket) — reusable for any future re-runs or hand-offs to other Claude Code sessions</li>
+    <li><strong>Historical context</strong> baked in — git-history findings on cooldown lineage, LoRa ACK origin of <code>alert_delivery_state</code>, the prod-cutover .env-copy-from-staging discovery</li>
+    <li><strong>Long-form HTML report</strong> at <code>report.html</code> with the full story</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="left">2. What's left (and why I can't do it alone)</h2>
+
+<div class="panel panel-bad">
+  <h4 style="margin-top:0;">RIC-301 — credentials. Confirmed via SSM into prod that the .env has only placeholders.</h4>
+  <p>Earlier framing was "creds were dropped in the 2026-05-06 cutover." Direct inspection of prod EC2 <code>i-0aa46f0468a9fd61e</code> shows the opposite: the prod <code>.env</code> was generated <strong>2026-05-05 — one day BEFORE the cutover</strong> — and its comments literally say <code># LINE messaging — copied from staging</code>. Staging only has placeholders, so prod inherited placeholders. <strong>This isn't a restoration task; it's a fresh-issuance task.</strong></p>
+  <p>What's in prod's <code>/opt/riceguard/env/.env</code> right now:</p>
+  <ul>
+    <li><code>LINE_CHANNEL_ID</code> = 10 chars, prefix <code>200...</code> — likely real (matches documented channel <code>2009081199</code>)</li>
+    <li><code>LINE_CHANNEL_SECRET</code> = 32 chars, prefix <code>CHA...</code> — almost certainly placeholder</li>
+    <li><code>LINE_CHANNEL_ACCESS_TOKEN</code> = 31 chars, prefix <code>CHA...</code> — <strong>confirmed placeholder</strong> (live-tested against LINE API → HTTP 401; real tokens are ~170+ chars)</li>
+    <li><code>FIREBASE_*</code>, <code>SMS_*</code>, <code>FCM_*</code>, <code>ALERT_PHONE_NUMBER</code> — <strong>not in the file at all</strong></li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="ric-301">3. RIC-301 execution sequence (when you have the values)</h2>
+
+<ol>
+  <li>
+    <strong>Issue fresh LINE long-lived access token (v2.1).</strong>
+    LINE Developers Console → channel <code>2009081199</code> → "Issue token" → save the ~170-char token.
+    Also verify <code>LINE_CHANNEL_SECRET</code> while you're there — if it's different from what's in prod, plan to update both.
+  </li>
+  <li>
+    <strong>Download Firebase service-account JSON.</strong>
+    Firebase Console → Project Settings → Service Accounts → "Generate new private key" → download the JSON.
+    You'll extract <code>project_id</code>, <code>client_email</code>, and <code>private_key</code> (with <code>\n</code> escaped for the env file).
+  </li>
+  <li>
+    <strong>Contact SMS vendor</strong> — the original Thai SOAP gateway (per Boris #102 / <code>nt-tag-id-backend</code>'s <code>src/controllers/send_sms.controller.js</code>). Request credentials for <code>SMS_USER</code>, <code>SMS_PASS</code>, <code>SMS_URL</code>, <code>SMS_SENDER</code>.
+    <em>Highest-friction step — start this first; it can run in parallel with the LINE and Firebase work above.</em>
+  </li>
+  <li>
+    <strong>SSM into prod and edit the <code>.env</code> file.</strong>
+    Once your IAM user has the policy in <a href="#iam-policy">Section 4</a> attached:
+    <pre><code>aws ssm start-session --target i-0aa46f0468a9fd61e
+sudo nano /opt/riceguard/env/.env
+# update LINE_CHANNEL_ACCESS_TOKEN
+# update LINE_CHANNEL_SECRET (if rotated)
+# add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY (with \n)
+# add SMS_USER, SMS_PASS, SMS_URL, SMS_SENDER
+# Ctrl-O, Ctrl-X
+cd /opt/riceguard
+sudo docker compose up -d --force-recreate riceguard-api</code></pre>
+  </li>
+  <li>
+    <strong>Verify with the three probes</strong> (from inside the same SSM session):
+    <pre><code># 1. LINE token live
+sudo docker exec riceguard-api sh -c \
+  'curl -s -o /dev/null -w "%{http_code}\n" \
+   -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+   https://api.line.me/v2/bot/info'
+# expect: 200
+
+# 2. Firebase init succeeded
+sudo docker logs --since 2m riceguard-api 2>&1 | grep -i firebase
+# expect: "[Firebase] Initialized" — NO "[Firebase] No credentials found"
+
+# 3. SMS gateway configured
+sudo docker logs --since 2m riceguard-api 2>&1 | grep -i sms
+# expect: presence of "[SMS] Gateway configured" or absence of "SMS gateway not configured"</code></pre>
+  </li>
+  <li>
+    <strong>30-minute observation window.</strong> Watch <code>docker logs -f riceguard-api</code> for auth-fail loops, log spam, or new errors. If clean, RIC-301 is done.
+  </li>
+  <li>
+    <strong>Run the RIC-303 seed script</strong> against prod-db (also via SSM) to wire Kwang's LINE UID into the test farm owner — this is what proves end-to-end Flex card delivery for the first time on this prod environment:
+    <pre><code>cd /opt/riceguard
+sudo docker compose run --rm riceguard-api \
+  bun run scripts/seed-line-user-id.ts --dry-run
+
+# review output, then:
+sudo docker compose run --rm riceguard-api \
+  bun run scripts/seed-line-user-id.ts --apply \
+  --email kwang-test+farmer1@riceguard.ai \
+  --line-uid U19cc78ea6e16143d559d373a14145b41
+# answer 'y' at the prompt</code></pre>
+    Wait 5 min for the next cron tick, then check <code>alert_delivery_log</code> for a LINE row with <code>status='sent'</code>.
+  </li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="iam-policy">4. IAM policy to send to your AWS admin</h2>
+
+<p>This is what unblocks Step 4 above. Send the <strong>JSON below</strong> plus the <strong>context paragraph</strong> to your AWS admin.</p>
+
+<div class="panel panel-info">
+  <h4 style="margin-top:0;">Context to send with the policy</h4>
+  <p>"Please attach the following IAM policy to a new IAM user named <code>riceguard-prod-cicd</code> (programmatic access only, no console login). This grants the minimum permissions needed to manage the 4 RiceGuard prod EC2 instances over AWS Systems Manager Session Manager — no SSH ingress is exposed on these hosts. Tag-scoped (Project=riceguard + Env=prod) so only the riceguard prod instances are reachable; staging and unrelated EC2s are excluded by the condition. No EC2 write, no IAM modifications, no cross-service blast radius. After creation, please send the access keys via your preferred secure channel — they'll be added to GitHub Secrets as <code>AWS_CICD_ACCESS_KEY_ID</code> / <code>AWS_CICD_SECRET_ACCESS_KEY</code> per the project's <code>.github/workflows/README-CICD.md</code>."</p>
+  <p>If your admin prefers to attach this inline to your existing personal IAM user <code>ittipol-aws</code> instead (as a short-term alternative), the policy works unchanged.</p>
+</div>
+
+<p>Account <code>654654475577</code> · Region <code>ap-southeast-7</code> · Target tags <code>Project=riceguard</code> + <code>Env=prod</code></p>
+
+<pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SsmSessionOnRiceguardProdEC2s",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession",
+        "ssm:TerminateSession",
+        "ssm:ResumeSession"
+      ],
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-7:654654475577:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/Project": "riceguard",
+          "ssm:resourceTag/Env": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "SsmSessionDocuments",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession"
+      ],
+      "Resource": [
+        "arn:aws:ssm:*::document/AWS-StartSSHSession",
+        "arn:aws:ssm:*::document/AWS-StartPortForwardingSession",
+        "arn:aws:ssm:*::document/SSM-SessionManagerRunShell"
+      ]
+    },
+    {
+      "Sid": "SsmSendCommandOnRiceguardProdEC2s",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-7:654654475577:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/Project": "riceguard",
+          "ssm:resourceTag/Env": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "SsmSendCommandShellDocument",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ssm:*::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "SsmReadCommandAndSessionResults",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations",
+        "ssm:ListCommands",
+        "ssm:DescribeSessions",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ec2DescribeForInstanceLookup",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SsmParameterStoreRiceguardProd",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:GetParametersByPath"
+      ],
+      "Resource": [
+        "arn:aws:ssm:ap-southeast-7:654654475577:parameter/riceguard/prod/*"
+      ]
+    }
+  ]
+}</code></pre>
+<p class="copy-hint">⌘/Ctrl+A inside the box to select all · copy/paste into email or Slack to the admin</p>
+
+<h3>What each statement does (admin's reference)</h3>
+
+<table>
+  <thead><tr><th>Sid</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>SsmSessionOnRiceguardProdEC2s</code></td><td>Open interactive shell via <code>aws ssm start-session</code> — for editing <code>/opt/riceguard/env/.env</code>, restarting containers, ad-hoc diagnostics. Tag-scoped.</td></tr>
+    <tr><td><code>SsmSessionDocuments</code></td><td>Permission on the AWS-managed Session Manager documents (no tag-scoping possible — these are AWS-owned).</td></tr>
+    <tr><td><code>SsmSendCommandOnRiceguardProdEC2s</code></td><td>One-shot scripted commands via <code>aws ssm send-command</code>. Tag-scoped.</td></tr>
+    <tr><td><code>SsmSendCommandShellDocument</code></td><td>Permission on the <code>AWS-RunShellScript</code> document used by SendCommand.</td></tr>
+    <tr><td><code>SsmReadCommandAndSessionResults</code></td><td>Read back output + list sessions/commands. Read-only metadata.</td></tr>
+    <tr><td><code>Ec2DescribeForInstanceLookup</code></td><td>List instances + tags so the operator can find <code>i-xxx</code> IDs. These APIs don't support resource-level scoping, so <code>Resource: "*"</code> is the AWS-recommended pattern.</td></tr>
+    <tr><td><code>SsmParameterStoreRiceguardProd</code></td><td>Read <code>/riceguard/prod/*</code> Parameter Store entries (used by <code>riceguard-sysinfo</code> service per the prod handover docs). Read-only.</td></tr>
+  </tbody>
+</table>
+
+<h3>What this policy explicitly does NOT grant</h3>
+<ul>
+  <li>❌ Any EC2 write (no terminate, stop, reboot, AMI ops)</li>
+  <li>❌ IAM modifications</li>
+  <li>❌ Access to non-prod EC2s (staging is excluded by the <code>Env=prod</code> tag condition)</li>
+  <li>❌ Cross-service access (no RDS, S3, secrets manager, etc.)</li>
+  <li>❌ Parameter Store <strong>write</strong> — read only</li>
+</ul>
+
+<h3>Target EC2s (the 4 instances the policy will grant access to)</h3>
+
+<table>
+  <thead>
+    <tr><th>Instance ID</th><th>Name tag</th><th>Private IP</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>i-0aa46f0468a9fd61e</code></td><td>Rice Guard Prod API</td><td>10.40.10.212</td></tr>
+    <tr><td><code>i-0f21012ac6240d468</code></td><td>Rice Guard Prod DB</td><td>10.40.10.155</td></tr>
+    <tr><td><code>i-084f4caaf4716f9d9</code></td><td>Rice Guard Prod Broker</td><td>10.40.10.242</td></tr>
+    <tr><td><code>i-01357f7c65795b7fc</code></td><td>Rice Guard Prod Static</td><td>10.40.10.200</td></tr>
+  </tbody>
+</table>
+
+<h3>Verification (run after admin attaches the policy)</h3>
+
+<p>This should succeed:</p>
+<pre><code>aws sts get-caller-identity                           # confirms identity
+aws ec2 describe-instances \
+  --filters "Name=tag:Project,Values=riceguard" \
+            "Name=tag:Env,Values=prod" \
+  --query 'Reservations[].Instances[].[InstanceId,Tags[?Key==`Name`]|[0].Value]' \
+  --output table                                       # lists the 4 prod EC2s
+aws ssm start-session --target i-0aa46f0468a9fd61e    # opens shell on prod API</code></pre>
+
+<p>This should be denied (proves scope tightness):</p>
+<pre><code>aws ssm start-session --target &lt;a-non-riceguard-instance-id&gt;
+# Expected: AccessDeniedException</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="artifacts">5. All artifacts in one place</h2>
+
+<h3>In the <code>Rice-Guard-API</code> repo (already on <code>develop</code>)</h3>
+<ul>
+  <li>Code changes from PRs <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/23">#23</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/24">#24</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/25">#25</a>, <a href="https://github.com/Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API/pull/26">#26</a></li>
+  <li><code>scripts/seed-line-user-id.ts</code> — for Step 7 of the RIC-301 sequence above</li>
+  <li><code>docs/design/RIC-303-liff-line-binding.md</code> — for Wasun (frontend handoff)</li>
+  <li><code>src/consumers/dlx.consumer.ts</code> — now consuming <code>q.alert.dlx</code></li>
+</ul>
+
+<h3>In <code>artemis-oracle/ψ/writing/megaprompts/ric-191-phase1-cleanup/</code> (your Oracle brain)</h3>
+<ul>
+  <li><code>README.md</code> — index + conventions + historical context + execution log</li>
+  <li><code>ric-301-restore-alert-creds.md</code> — full mega-prompt for the credential restoration (if you ever want to delegate to another Claude session)</li>
+  <li><code>ric-302-line-silent-skip.md</code>, <code>ric-303-seed-line-user-id.md</code>, <code>ric-304-fcm-silent-skip.md</code>, <code>ric-305-dlx-and-writers.md</code> — the other four mega-prompts (all executed; archived for reuse)</li>
+  <li><code>iam-policy-riceguard-prod.json</code> — the policy file (copy of Section 4 above)</li>
+  <li><code>iam-policy-handoff.md</code> — detailed admin-facing handoff doc</li>
+  <li><code>report.html</code> — the full long-form historical report</li>
+  <li><code>summary.html</code> — this document</li>
+</ul>
+
+<h3>Commits on artemis-oracle <code>main</code> (local, not pushed)</h3>
+<ul>
+  <li><code>3091fb3</code> — initial 5 mega-prompts</li>
+  <li><code>06ba2b8</code> — historical-context backports</li>
+  <li><code>a280188</code> — RIC-301 cred-hunt findings (definitive)</li>
+  <li><code>83c4bb4</code> — SSM-verified prod .env state</li>
+  <li><code>e6d4850</code> — all 4 PRs merged, execution log updated</li>
+  <li><code>(latest)</code> — IAM policy + this summary</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="next">6. Order of operations from here</h2>
+
+<ol>
+  <li><strong>Today / tomorrow:</strong> send the JSON policy from <a href="#iam-policy">Section 4</a> to the AWS admin. Start the SMS vendor contact in parallel (highest friction).</li>
+  <li><strong>When AWS admin confirms policy attached:</strong> run the three verification commands at the end of Section 4 to confirm scope.</li>
+  <li><strong>When LINE token + Firebase key are in hand:</strong> follow Steps 4–6 of the RIC-301 sequence in <a href="#ric-301">Section 3</a> to write to prod <code>.env</code>, restart, and verify.</li>
+  <li><strong>When SMS vendor responds:</strong> add SMS_* vars in the same way, restart again, run the SMS probe.</li>
+  <li><strong>When all three channels are live:</strong> run the seed script (Step 7) to bind Kwang's LINE UID into the test farm owner. Wait 5 min for the cron tick. Check <code>alert_delivery_log</code> for the first real <code>LINE | sent</code> row in this prod environment.</li>
+</ol>
+
+<p>That last step is the closing milestone of RIC-191 Phase 1 — when LINE delivery is end-to-end provable, the cleanup is genuinely done.</p>
+
+<div class="footer">
+  Generated 2026-05-20 by Artemis (Claude Opus 4.7) for Fiez ·
+  <span class="pill">/df-deep-build → execute → research → SSM verify → handoff</span>
+</div>
+
+</body>
+</html>
