@@ -489,11 +489,14 @@ strp () {
 
 	# v3: recent CLI sessions — compute now to decide 0) visibility.
 	local recent_rows
-	local -a recent_arr
+	local -a recent_arr=()
 	recent_rows="$(_strp_recent_sessions)"
-	recent_arr=("${(@f)recent_rows}")
-	# (@f) splits on newline; a trailing empty element may sneak in.
-	[[ -z "${recent_arr[-1]:-}" ]] && recent_arr[-1]=()
+	# Only split when there's real content. Splitting "" with (@f) yields
+	# a single empty element that the array[-1]=() pop trick doesn't
+	# always clean up reliably, which would surface 0) with zero rows.
+	if [[ -n "$recent_rows" ]]; then
+		recent_arr=("${(@f)recent_rows}")
+	fi
 	local recent_count=${#recent_arr[@]}
 
 	echo "Select:"
@@ -542,6 +545,7 @@ strp () {
 			echo "1) glm   (clother-zai --model glm-5.1 --yolo)"
 			echo "2) claude (claude --dangerously-skip-permissions)"
 			echo "3) codex  (codex --dangerously-bypass-approvals-and-sandbox)"
+			echo "4) Open Claude agents view (claude agents in $oracle_name)"
 			echo "-----------------------------------"
 			read "runner? "
 			case "$runner" in
@@ -556,6 +560,10 @@ strp () {
 				3)
 					_strp_log "launch_oracle" "$oracle_name" "codex" "$oracle_dir"
 					cd "$oracle_dir" && codex --dangerously-bypass-approvals-and-sandbox
+					;;
+				4)
+					_strp_log "open_agents" "$oracle_name" "claude" "$oracle_dir"
+					cd "$oracle_dir" && claude agents
 					;;
 				*)
 					echo "Invalid runner."
