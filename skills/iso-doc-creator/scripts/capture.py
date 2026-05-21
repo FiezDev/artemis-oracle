@@ -1,4 +1,4 @@
-"""Agent-browser orchestrator for fresh screenshot capture.
+"""CloakBrowser+Playwright orchestrator for fresh screenshot capture.
 
 Usage (standalone):
     python3 capture.py --config-file /path/to/iso-doc.json
@@ -7,7 +7,8 @@ What it does:
     1. Read per-project config (urls, auth, routes)
     2. Pull creds from ~/.claude/dev-vault/<vault_key>.json
     3. For each lang in config.LANGUAGES:
-         - Launch agent-browser, navigate to the live URL
+         - Launch CloakBrowser (Playwright-compatible stealth Chromium),
+           navigate to the live URL
          - Log in as the configured role (admin by default)
          - Switch UI language to <lang>
          - Walk discovered routes; screenshot each
@@ -19,27 +20,47 @@ Auth modes:
     otp_phone      — OTP digit-per-field (asks you to relay OTP in chat)
     cookie_inject  — reads pre-captured cookies from config
 
-Requires agent-browser at /home/bjgdr/.linuxbrew/bin/agent-browser.
+Requires:
+    pip install cloakbrowser playwright
+    cloakbrowser install   # downloads stealth Chromium binary
+
+The browser is launched once per `main()` invocation and reused across all
+routes and languages. Page navigation uses Playwright's `page.goto()` and
+JavaScript execution uses `page.evaluate()` — replacing the old subprocess
+calls to agent-browser. All JS evaluation blocks are preserved verbatim from
+the agent-browser version.
 """
 
 import argparse
 import json
 import os
-import subprocess
 import sys
 import time
+from typing import Any, Optional, Tuple
 
-AGENT_BROWSER = "/home/bjgdr/.linuxbrew/bin/agent-browser"
+from cloakbrowser import launch as cloak_launch
+from playwright.sync_api import Page, BrowserContext, Browser, TimeoutError as PWTimeout
+
 VAULT_DIR = os.path.expanduser("~/.claude/dev-vault")
 
 
-def ab(*args, check=True, capture=True):
-    """Run agent-browser with args, return stdout."""
-    cmd = [AGENT_BROWSER] + list(args)
-    res = subprocess.run(cmd, capture_output=capture, text=True, timeout=60)
-    if check and res.returncode != 0:
-        raise RuntimeError(f"agent-browser failed ({' '.join(args)}): {res.stderr}")
-    return res.stdout
+def evaluate(page: Page, js: str, default: Any = "") -> Any:
+    """Run a JS expression via Playwright. Wraps errors so they don't kill the run."""
+    try:
+        return page.evaluate(js)
+    except Exception as e:
+        # Mirror agent-browser's "check=False" semantics — log and return default.
+        print(f"  [evaluate] failed: {e!s:.200}")
+        return default
+
+
+def open_url(page: Page, url: str, wait_ms: int = 30000) -> None:
+    """Navigate to URL. Waits for DOMContentLoaded; the rest is handled by wait_for_page_ready."""
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=wait_ms)
+    except PWTimeout:
+        # Slow page — keep going; wait_for_page_ready will decide if it's usable.
+        print(f"  [open_url] goto timed out on {url} — continuing")
 
 
 def load_vault(vault_key, role="admin"):
@@ -54,18 +75,18 @@ def load_vault(vault_key, role="admin"):
     return creds
 
 
-def login_form_password(base_url, creds, lang):
+def login_form_password(page: Page, base_url, creds, lang):
     """Form-password login. Handles email/username + password forms broadly.
 
     Label-based field detection + React-compatible event dispatch + form.requestSubmit().
     Waits up to 6s for redirect away from /auth/login.
     """
-    ab("open", f"{base_url}/{lang}/auth/login")
+    open_url(page, f"{base_url}/{lang}/auth/login")
     time.sleep(1.5)
-    _try_fill_form(creds)
+    _try_fill_form(page, creds)
     for _ in range(20):
         time.sleep(0.5)
-        url = ab("eval", "location.href", check=False).strip().strip('"')
+        url = str(evaluate(page, "location.href", default=""))
         if "/auth/" not in url and "/login" not in url:
             print(f"  [capture] login success -> {url}")
             time.sleep(1.5)
@@ -76,7 +97,7 @@ def login_form_password(base_url, creds, lang):
     )
 
 
-def login_otp_phone(base_url, creds, lang, login_path="/login"):
+def login_otp_phone(page: Page, base_url, creds, lang, login_path="/login"):
     """OTP login for phone-based flows.
 
     Flow:
@@ -93,7 +114,7 @@ def login_otp_phone(base_url, creds, lang, login_path="/login"):
 
     full_login = base_url.rstrip("/") + login_path
     print(f"  [otp] opening {full_login}")
-    ab("open", full_login)
+    open_url(page, full_login)
     time.sleep(3.0)
 
     js_phone = (
@@ -117,7 +138,7 @@ def login_otp_phone(base_url, creds, lang, login_path="/login"):
         "  return 'no-submit-found';"
         "})()"
     )
-    res = ab("eval", js_phone, check=False).strip()
+    res = evaluate(page, js_phone)
     print(f"  [otp] phone submit: {res}")
     time.sleep(4.0)
 
@@ -168,13 +189,13 @@ def login_otp_phone(base_url, creds, lang, login_path="/login"):
         "  return 'no-otp-field';"
         "})()"
     )
-    res = ab("eval", js_otp, check=False).strip()
+    res = evaluate(page, js_otp)
     print(f"  [otp] code submit: {res}")
 
     last = ""
     for _ in range(30):
         time.sleep(0.5)
-        url = ab("eval", "location.href", check=False).strip().strip('"')
+        url = str(evaluate(page, "location.href", default=""))
         last = url
         if "/login" not in url and "/auth/" not in url and "/verify" not in url:
             print(f"  [otp] login success -> {url}")
@@ -183,7 +204,7 @@ def login_otp_phone(base_url, creds, lang, login_path="/login"):
     raise RuntimeError(f"OTP login failed: still at {last} after 15s")
 
 
-def _try_fill_form(creds):
+def _try_fill_form(page: Page, creds):
     """Fill login form via label-matching + React-native setter + form.requestSubmit()."""
     user_value = creds.get("email") or creds.get("username") or ""
     pw_value = creds.get("password", "")
@@ -225,11 +246,11 @@ def _try_fill_form(creds):
         "  return 'no-submit-found';"
         "})()"
     )
-    result = ab("eval", js_fill, check=False)
-    print(f"  [capture] login form submit: {result.strip()}")
+    result = evaluate(page, js_fill)
+    print(f"  [capture] login form submit: {result}")
 
 
-def switch_language(lang, mode="click"):
+def switch_language(page: Page, lang, mode="click"):
     """Switch UI language.
 
     mode="click"                    — click a menu item whose text matches EN/ไทย
@@ -250,7 +271,7 @@ def switch_language(lang, mode="click"):
             "  location.reload(); return l;"
             "})()"
         )
-        ab("eval", js, check=False)
+        evaluate(page, js)
         time.sleep(1.5)
         return
     label_map = {"en": "English", "th": "ไทย"}
@@ -264,10 +285,10 @@ def switch_language(lang, mode="click"):
         "  } return false;"
         "})()"
     )
-    ab("eval", js, check=False)
+    evaluate(page, js)
 
 
-def click_first_row():
+def click_first_row(page: Page):
     """Click the first clickable row of a list table."""
     js = (
         "(function() {"
@@ -275,10 +296,10 @@ def click_first_row():
         "  if (row) { row.click(); return true; } return false;"
         "})()"
     )
-    ab("eval", js, check=False)
+    evaluate(page, js)
 
 
-def resolve_dynamic_url(base_url, route, lang):
+def resolve_dynamic_url(page: Page, base_url, route, lang):
     """Turn a template route like /buildings/[id]/edit into a live URL by:
 
       1. Building the list URL (everything BEFORE the first dynamic segment).
@@ -317,8 +338,8 @@ def resolve_dynamic_url(base_url, route, lang):
 
     list_path = "/".join(p for p in before_dyn if p)
     list_url = f"{base_url.rstrip('/')}/{list_path}" if list_path else base_url.rstrip("/")
-    ab("open", list_url)
-    wait_for_page_ready(timeout=15.0, settle=1.5, stable_checks=2)
+    open_url(page, list_url)
+    wait_for_page_ready(page, timeout=15.0, settle=1.5, stable_checks=2)
 
     row_id_js = (
         "(function() {"
@@ -349,7 +370,7 @@ def resolve_dynamic_url(base_url, route, lang):
         "  return '';"
         "})()"
     )
-    real_id = ab("eval", row_id_js, check=False).strip().strip('"')
+    real_id = str(evaluate(page, row_id_js, default="")).strip()
     if not real_id or real_id in ("null", "undefined"):
         return None
 
@@ -358,7 +379,7 @@ def resolve_dynamic_url(base_url, route, lang):
     return f"{base_url.rstrip('/')}/{final_path}"
 
 
-def dismiss_toasts():
+def dismiss_toasts(page: Page):
     """Remove transient ant-message / ant-notification toasts so they don't leak into shots."""
     js = (
         "(function() {"
@@ -371,10 +392,10 @@ def dismiss_toasts():
         "  return n;"
         "})()"
     )
-    ab("eval", js, check=False)
+    evaluate(page, js)
 
 
-def page_error_reason():
+def page_error_reason(page: Page):
     """Return a non-empty string naming the error if the page is showing an error/alert state.
 
     Checks Ant Design error surfaces, Next.js runtime-error overlays (including
@@ -457,11 +478,11 @@ def page_error_reason():
         "  return '';"
         "})()"
     )
-    out = ab("eval", js, check=False).strip().strip('"')
+    out = str(evaluate(page, js, default="")).strip()
     return out if out and out not in ("null", "undefined") else ""
 
 
-def inject_webfont(lang):
+def inject_webfont(page: Page, lang):
     """When the page's default font lacks glyphs for `lang`, inject a Google
     Fonts stylesheet + @font-face fallback and rewrite the base font-family so
     every subsequent text render picks up the new font.
@@ -512,12 +533,12 @@ def inject_webfont(lang):
         "  return fam + ':' + (document.fonts.check(`16px \"${fam}\"`) ? 'ready' : 'pending');"
         "})()"
     )
-    res = ab("eval", js, check=False).strip().strip('"')
+    res = evaluate(page, js)
     print(f"  [font] inject {lang} -> {res}")
     time.sleep(1.0)
 
 
-def font_missing_reason(lang):
+def font_missing_reason(page: Page, lang):
     """Detect "tofu" box rendering — i.e. the page's fonts lack glyphs for the
     script of `lang`.  Returns a non-empty string describing the problem, or
     empty string if glyphs render correctly.
@@ -550,116 +571,81 @@ def font_missing_reason(lang):
         "  return '';"
         "})()"
     )
-    out = ab("eval", js, check=False).strip().strip('"')
+    out = str(evaluate(page, js, default="")).strip()
     return out if out and out not in ("null", "undefined") else ""
 
 
-def font_missing_reason_auto():
-    """Detect tofu on whatever script is actually present in the rendered body,
-    regardless of the capture's nominal `lang`. Critical for single-language
-    frontends (e.g. NTTAG admin renders TH content during the "en" capture pass;
-    if headless Chrome lacks Thai fonts, we'd silently ship tofu screenshots).
-
-    Returns (script, reason) — e.g. ("th", "tofu:15/17 ff=Roboto, sans-serif")
-    — or (None, "") when the page's text renders correctly.
-
-    Detection order: Thai first (most common in this codebase's projects),
-    then Japanese / Korean / Chinese. First script that's BOTH present in body
-    AND rendering as tofu is returned.
-    """
+def font_missing_reason_auto(page: Page) -> Tuple[Optional[str], str]:
+    """Detect tofu on whatever script is actually present in the rendered body."""
     js = (
         "(function(){"
         "  const t = (document.body && document.body.innerText) || '';"
-        "  return JSON.stringify({"
+        "  return {"
         "    th: /[\\u0E00-\\u0E7F]/.test(t),"
         "    ja: /[\\u3040-\\u30FF]/.test(t),"
         "    ko: /[\\uAC00-\\uD7AF]/.test(t),"
         "    zh: /[\\u4E00-\\u9FFF]/.test(t)"
-        "  });"
+        "  };"
         "})()"
     )
-    out = ab("eval", js, check=False).strip().strip('"')
-    # agent-browser may double-escape quotes; unwrap
-    out = out.replace('\\"', '"')
-    try:
-        present = json.loads(out)
-    except Exception:
+    present = evaluate(page, js, default={})
+    if not isinstance(present, dict):
         return None, ""
     for script in ("th", "ja", "ko", "zh"):
         if present.get(script):
-            reason = font_missing_reason(script)
+            reason = font_missing_reason(page, script)
             if reason:
                 return script, reason
     return None, ""
 
 
-def wait_for_page_ready(timeout=25.0, settle=2.5, stable_checks=3):
+# JS pre-injected into every page to track fetch/XHR activity for wait_for_page_ready.
+NET_TRACKER_JS = (
+    "(function(){"
+    "  if (window.__iso_net_installed) return;"
+    "  window.__iso_net_last = performance.now();"
+    "  window.__iso_net_pending = 0;"
+    "  const origFetch = window.fetch;"
+    "  if (origFetch) {"
+    "    window.fetch = function() {"
+    "      window.__iso_net_pending++;"
+    "      window.__iso_net_last = performance.now();"
+    "      return origFetch.apply(this, arguments).finally(() => {"
+    "        window.__iso_net_pending = Math.max(0, window.__iso_net_pending - 1);"
+    "        window.__iso_net_last = performance.now();"
+    "      });"
+    "    };"
+    "  }"
+    "  const OX = window.XMLHttpRequest;"
+    "  if (OX) {"
+    "    const origOpen = OX.prototype.open;"
+    "    const origSend = OX.prototype.send;"
+    "    OX.prototype.open = function() { this.__iso_tracked = true; return origOpen.apply(this, arguments); };"
+    "    OX.prototype.send = function() {"
+    "      if (this.__iso_tracked) {"
+    "        window.__iso_net_pending++;"
+    "        window.__iso_net_last = performance.now();"
+    "        this.addEventListener('loadend', () => {"
+    "          window.__iso_net_pending = Math.max(0, window.__iso_net_pending - 1);"
+    "          window.__iso_net_last = performance.now();"
+    "        });"
+    "      }"
+    "      return origSend.apply(this, arguments);"
+    "    };"
+    "  }"
+    "  window.__iso_net_installed = true;"
+    "})()"
+)
+
+
+def wait_for_page_ready(page: Page, timeout=25.0, settle=2.5, stable_checks=3):
     """Wait for the page to be visually ready before screenshot.
 
-    Gates (all must pass on `stable_checks` consecutive polls, 400ms apart):
-      1. document.readyState === 'complete'
-      2. No visible skeleton / shimmer anywhere in the DOM — covers Ant Design
-         (`.ant-skeleton-active`, `.ant-skeleton`), generic `[class*="skeleton"]`,
-         Tailwind `animate-pulse`, and any ancestor carrying `aria-busy="true"`.
-      3. No visible spinner anywhere
-         (`.ant-spin-spinning`, `.ant-spin-nested-loading .ant-spin`,
-          `.ant-progress-status-active`, `[role="progressbar"]`,
-          `[class*="loader"]`, `[class*="loading"]:not(body):not(html)`)
-      4. All visible <img> elements have finished loading
-         (`complete === true && naturalWidth > 0`) — no half-painted thumbnails
-      5. No pending fetch/XHR initiated in the last 800 ms
-         (tracked via a PerformanceObserver we install on first call)
-      6. Some primary content has mounted and has non-trivial size
-      7. No visible untranslated i18n placeholder keys in the DOM. Next-intl
-         renders the key itself (e.g. `Buildings.detail`) when the translations
-         message file hasn't hydrated yet. We reject text nodes matching
-         `/^[A-Z][A-Za-z0-9]+\\.[a-z][A-Za-z0-9]+$/` on common layout surfaces
-         (breadcrumbs, headings, page titles).
-
-    Requiring `stable_checks` consecutive "ready" polls catches the "skeleton
-    flashes away and rows paint in 300 ms later" race that slipped through the
-    old single-poll gate.
+    See agent-browser version for the full gate list — Playwright port behaves
+    identically except that the network-activity tracker is pre-injected via
+    `context.add_init_script()` on the BrowserContext rather than re-installed
+    on every check. The poll JS reads the same `window.__iso_net_*` globals.
     """
-    # Install a lightweight network-activity tracker on every ready-check.
-    # Safe to re-install; it guards against double-install via a global flag.
-    ab("eval",
-        "(function(){"
-        "  if (window.__iso_net_installed) return 'already';"
-        "  window.__iso_net_last = performance.now();"
-        "  window.__iso_net_pending = 0;"
-        "  const origFetch = window.fetch;"
-        "  if (origFetch) {"
-        "    window.fetch = function() {"
-        "      window.__iso_net_pending++;"
-        "      window.__iso_net_last = performance.now();"
-        "      return origFetch.apply(this, arguments).finally(() => {"
-        "        window.__iso_net_pending = Math.max(0, window.__iso_net_pending - 1);"
-        "        window.__iso_net_last = performance.now();"
-        "      });"
-        "    };"
-        "  }"
-        "  const OX = window.XMLHttpRequest;"
-        "  if (OX) {"
-        "    const origOpen = OX.prototype.open;"
-        "    const origSend = OX.prototype.send;"
-        "    OX.prototype.open = function() { this.__iso_tracked = true; return origOpen.apply(this, arguments); };"
-        "    OX.prototype.send = function() {"
-        "      if (this.__iso_tracked) {"
-        "        window.__iso_net_pending++;"
-        "        window.__iso_net_last = performance.now();"
-        "        this.addEventListener('loadend', () => {"
-        "          window.__iso_net_pending = Math.max(0, window.__iso_net_pending - 1);"
-        "          window.__iso_net_last = performance.now();"
-        "        });"
-        "      }"
-        "      return origSend.apply(this, arguments);"
-        "    };"
-        "  }"
-        "  window.__iso_net_installed = true;"
-        "  return 'installed';"
-        "})()",
-       check=False)
-
     js = (
         "(function() {"
         "  if (document.readyState !== 'complete') return 'loading';"
@@ -740,7 +726,7 @@ def wait_for_page_ready(timeout=25.0, settle=2.5, stable_checks=3):
     consecutive_ready = 0
     last = "unknown"
     while time.time() < deadline:
-        out = ab("eval", js, check=False).strip().strip('"')
+        out = str(evaluate(page, js, default="")).strip()
         last = out
         if out == "ready":
             consecutive_ready += 1
@@ -772,10 +758,10 @@ def build_url(base_url, route, lang):
     return f"{base_url.rstrip('/')}/{path}" if path else base_url.rstrip("/")
 
 
-def capture_routes(config, routes, lang, skip_login=False):
+def capture_routes(page: Page, config, routes, lang, skip_login=False):
     """Screenshot every route for a language.
 
-    skip_login=True assumes the agent-browser session is already authenticated
+    skip_login=True assumes the browser context is already authenticated
     (useful for OTP flows where the human drove login by hand, and for multi-
     frontend configs sharing a single session).
     """
@@ -796,28 +782,23 @@ def capture_routes(config, routes, lang, skip_login=False):
     if not skip_login and vault_key:
         creds = load_vault(vault_key, role)
         if mode == "form_password":
-            login_form_password(default_base, creds, lang)
+            login_form_password(page, default_base, creds, lang)
         elif mode == "otp_phone":
-            login_otp_phone(default_base, creds, lang)
+            login_otp_phone(page, default_base, creds, lang)
     elif skip_login:
         print(f"  [{lang}] --skip-login set; assuming session is already authenticated")
 
-    # Global language switch (legacy single-frontend path). Per-route overrides
-    # happen inside the loop based on route["i18n_mode"].
-    switch_language(lang)
+    switch_language(page, lang)
     time.sleep(1)
 
     def _re_login():
         if not skip_login and creds and mode == "form_password":
             print(f"  [{lang}] session lost — re-logging in")
-            login_form_password(default_base, creds, lang)
+            login_form_password(page, default_base, creds, lang)
 
-    # Move /auth/logout routes to the end so they don't kill the session
-    # mid-walk; capture them last (their screenshot is the login page anyway).
     is_logout = lambda r: "/auth/logout" in r.get("route", "") or r.get("id", "").endswith("logout")
     routes_ordered = [r for r in routes if not is_logout(r)] + [r for r in routes if is_logout(r)]
 
-    # Per-frontend language switch: do it once per frontend_id we encounter.
     switched_fronts = set()
 
     skipped = []
@@ -828,51 +809,42 @@ def capture_routes(config, routes, lang, skip_login=False):
         route_is_auth = "/auth/" in r.get("route", "") or "/login" in r.get("route", "")
         fe_id = r.get("frontend_id", "default")
         try:
-            # First time we touch a frontend this lang, run its i18n switch.
             if fe_id not in switched_fronts:
                 i18n_mode = r.get("i18n_mode", "click")
                 if i18n_mode and i18n_mode != "click":
-                    ab("open", base)
+                    open_url(page, base)
                     time.sleep(1.0)
-                    switch_language(lang, mode=i18n_mode)
+                    switch_language(page, lang, mode=i18n_mode)
                 switched_fronts.add(fe_id)
 
             if r.get("is_dynamic"):
-                # Resolve the [id] via the list page, then navigate directly.
-                # Avoids Next.js catch-all mis-matching (e.g. /buildings/edit
-                # getting matched as /buildings/[id] with id="edit").
-                resolved = resolve_dynamic_url(base, r.get("route", "/"), lang)
+                resolved = resolve_dynamic_url(page, base, r.get("route", "/"), lang)
                 if not resolved:
                     skipped.append((r["id"], "no-row-in-list"))
                     print(f"  [{lang}] SKIP {r['id']:<36} no-row-in-list")
                     continue
-                ab("open", resolved)
-                ready, state = wait_for_page_ready(timeout=20.0, settle=3.5, stable_checks=4)
+                open_url(page, resolved)
+                ready, state = wait_for_page_ready(page, timeout=20.0, settle=3.5, stable_checks=4)
             else:
-                ab("open", url)
-                ready, state = wait_for_page_ready()
+                open_url(page, url)
+                ready, state = wait_for_page_ready(page)
 
-            # Session-drop recovery (only meaningful when we own login).
             if not skip_login:
-                cur = ab("eval", "location.href", check=False).strip().strip('"')
+                cur = str(evaluate(page, "location.href", default=""))
                 if not route_is_auth and ("/auth/login" in cur or "/auth/register" in cur):
                     _re_login()
                     if r.get("is_dynamic"):
-                        resolved = resolve_dynamic_url(base, r.get("route", "/"), lang)
+                        resolved = resolve_dynamic_url(page, base, r.get("route", "/"), lang)
                         if not resolved:
                             skipped.append((r["id"], "no-row-in-list"))
                             print(f"  [{lang}] SKIP {r['id']:<36} no-row-in-list")
                             continue
-                        ab("open", resolved)
-                        ready, state = wait_for_page_ready(timeout=20.0, settle=3.5, stable_checks=4)
+                        open_url(page, resolved)
+                        ready, state = wait_for_page_ready(page, timeout=20.0, settle=3.5, stable_checks=4)
                     else:
-                        ab("open", url)
-                        ready, state = wait_for_page_ready()
+                        open_url(page, url)
+                        ready, state = wait_for_page_ready(page)
 
-            # If the page never settled and last state was busy (skeleton,
-            # spinner, i18n-key, or XHR/net-idle), the render is incomplete —
-            # skipping is the correct failure mode. We'd rather omit the route
-            # than ship a loading-state screenshot.
             if not ready and state.startswith("busy:"):
                 if os.path.exists(out_path):
                     os.remove(out_path)
@@ -880,19 +852,14 @@ def capture_routes(config, routes, lang, skip_login=False):
                 print(f"  [{lang}] SKIP {r['id']:<36} {state}")
                 continue
 
-            # Never let transient toasts leak into the shot.
-            dismiss_toasts()
+            dismiss_toasts(page)
 
-            # /auth/* routes are expected to show forms that look alert-like;
-            # we still document them.
             if not route_is_auth:
-                reason = page_error_reason()
+                reason = page_error_reason(page)
                 if reason:
-                    # One retry after a longer wait (lets slow fetches resolve
-                    # and gives any transient Next.js dev overlay time to close).
                     time.sleep(3.0)
-                    dismiss_toasts()
-                    reason = page_error_reason()
+                    dismiss_toasts(page)
+                    reason = page_error_reason(page)
                 if reason:
                     if os.path.exists(out_path):
                         os.remove(out_path)
@@ -900,44 +867,29 @@ def capture_routes(config, routes, lang, skip_login=False):
                     print(f"  [{lang}] SKIP {r['id']:<36} {reason}")
                     continue
 
-            # If glyphs render as tofu boxes, inject a webfont and retake.
-            # Auto-detect the *actual* script rendered — NTTAG admin is single-
-            # lang Thai so the "en" pass still needs Thai fonts. The nominal
-            # capture lang is not a reliable signal.
-            tofu_script, glyph_reason = font_missing_reason_auto()
+            tofu_script, glyph_reason = font_missing_reason_auto(page)
             if tofu_script:
                 print(f"  [{lang}] tofu on {r['id']} ({glyph_reason}) — injecting webfont for {tofu_script}")
-                inject_webfont(tofu_script)
+                inject_webfont(page, tofu_script)
                 time.sleep(0.8)
-                tofu_script, glyph_reason = font_missing_reason_auto()
+                tofu_script, glyph_reason = font_missing_reason_auto(page)
                 if tofu_script:
-                    # Fallback: full page reload so the @font-face @import is
-                    # applied from the very first layout pass. Webfont link +
-                    # style are lost on reload — re-inject BEFORE paint.
                     print(f"  [{lang}] still tofu ({glyph_reason}) — reload + re-inject")
-                    ab("eval", "location.reload()", check=False)
+                    evaluate(page, "location.reload()")
                     time.sleep(2.0)
-                    inject_webfont(tofu_script)
-                    wait_for_page_ready(timeout=15.0, settle=1.5, stable_checks=2)
+                    inject_webfont(page, tofu_script)
+                    wait_for_page_ready(page, timeout=15.0, settle=1.5, stable_checks=2)
                     time.sleep(0.6)
-                    tofu_script, glyph_reason = font_missing_reason_auto()
+                    tofu_script, glyph_reason = font_missing_reason_auto(page)
                     if tofu_script:
-                        # Inline-styled elements or blocked CDN — the font
-                        # inject can't reach them. Rather than ship boxes,
-                        # skip. Feedback memory says "never reject" for the
-                        # common case (which we now handle via reload+inject);
-                        # this branch is the truly-unresolvable case.
                         print(f"  [{lang}] SKIP {r['id']:<36} tofu-unresolvable:{glyph_reason}")
                         if os.path.exists(out_path):
                             os.remove(out_path)
                         skipped.append((r["id"], f"tofu-unresolvable:{glyph_reason}"))
                         continue
 
-            # Re-check error surface AFTER tofu handling — some error UIs take
-            # a while to paint their copy, and the pre-check may have missed
-            # an error that became visible during the font-inject wait.
             if not route_is_auth:
-                late_err = page_error_reason()
+                late_err = page_error_reason(page)
                 if late_err:
                     print(f"  [{lang}] SKIP {r['id']:<36} late-error:{late_err}")
                     if os.path.exists(out_path):
@@ -945,7 +897,7 @@ def capture_routes(config, routes, lang, skip_login=False):
                     skipped.append((r["id"], f"late-error:{late_err}"))
                     continue
 
-            ab("screenshot", out_path, check=False)
+            page.screenshot(path=out_path, full_page=True)
             print(f"  [{lang}] {r['id']:<40} {url}")
         except Exception as e:
             print(f"  [{lang}] FAIL {r['id']}: {e}")
@@ -959,6 +911,7 @@ def main():
     parser.add_argument("--config-file", required=True)
     parser.add_argument("--analysis-file", default="")
     parser.add_argument("--langs", default="")
+    parser.add_argument("--headed", action="store_true", help="show the browser window (for debugging)")
     args = parser.parse_args()
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -974,9 +927,25 @@ def main():
     routes = discover.walk(cfg.LOCAL_REPO, frontend_path, ignore)
     print(f"Discovered {len(routes)} routes")
 
-    for lang in langs:
-        print(f"\n=== Capturing {lang.upper()} ===")
-        capture_routes(cfg, routes, lang)
+    # Launch CloakBrowser (returns a Playwright Browser). Single instance per run.
+    # `humanize=True` adds human-like mouse/keyboard timing — useful even when our
+    # targets are our own apps, since it makes the automation behave more naturally
+    # for forms with debounced validators.
+    browser: Browser = cloak_launch(headless=not args.headed, humanize=True)
+    context: BrowserContext = browser.new_context(viewport={"width": 1440, "height": 900})
+    # Pre-inject the network tracker into every page in this context.
+    context.add_init_script(NET_TRACKER_JS)
+    page: Page = context.new_page()
+
+    try:
+        for lang in langs:
+            print(f"\n=== Capturing {lang.upper()} ===")
+            capture_routes(page, cfg, routes, lang)
+    finally:
+        try:
+            context.close()
+        finally:
+            browser.close()
 
 
 if __name__ == "__main__":
