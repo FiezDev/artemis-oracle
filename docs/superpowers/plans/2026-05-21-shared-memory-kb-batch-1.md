@@ -22,6 +22,17 @@
 
 **⚠ Prerequisite (must be done BEFORE merging this batch):** The Postgres server on the EC2 must have the `pgvector` extension's apt package installed. PG14 on Ubuntu → `sudo apt-get install -y postgresql-14-pgvector` (substitute the right PG major version for your box). Without this, `CREATE EXTENSION vector` will fail with `could not open extension control file ".../vector.control"` and the deploy.yml migration step will abort (caught here the first time — see `gh run view <id>` for the merge of PR #1). Re-running `bun db:migrate` manually after installing the apt package will apply the migration; deploy.yml's auto-detect only fires when the migration file itself changes, so a manual replay is needed after the one-time apt install.
 
+**⚠ Prerequisite #2 (PGDG repo + superuser):** The default Ubuntu 22.04 sources do NOT ship `postgresql-14-pgvector`. Add PostgreSQL's PGDG repo first (`apt.postgresql.org`), then install the package. Once installed: `CREATE EXTENSION vector` requires **superuser** privileges; the app's DB role (`jirafetch`) is not a superuser, so the migration would still fail with `permission denied to create extension "vector"` even with the package installed. Workaround: as the postgres OS user, run `sudo -u postgres psql -d jirafetch -c "CREATE EXTENSION IF NOT EXISTS vector"` once. After that, the migration's `CREATE EXTENSION IF NOT EXISTS vector` is a no-op and `bun db:migrate` succeeds. (Discovered live on 2026-05-21 deploy.)
+
+**⚠ Prerequisite #3 (ARM64 CPU-only torch for the sidecar):** On aarch64 (the Tools EC2's arch) `pip install sentence-transformers` pulls in CUDA-flavoured torch by default, dragging in `nvidia-cublas`, `nvidia-cudnn-cu13`, `cuda-toolkit`, etc. — many GB of wheels that are useless on a GPU-less ARM box and will fill a 20GB volume. **Install CPU-only torch first** from PyTorch's CPU index, then the rest of requirements.txt finds torch already satisfied:
+
+```bash
+.venv/bin/pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+```
+
+Also `--no-cache-dir` matters: pip stages downloaded wheels in `~/.cache/pip` AND unpacks them into the venv, doubling on-disk footprint mid-install. With 5-6 GB free on a 20GB box, the cache push can OOM the disk. With `--no-cache-dir`, wheels go straight to the venv and are deleted after install.
+
 ---
 
 ## File map
