@@ -21,6 +21,8 @@
 - GH Actions deploy.yml extensions for the sidecar venv (batch 5)
 - Multi-key auth, per-dev tokens, audit logging — spec §7 explicitly chose single shared bearer
 
+**Gotcha caught during the final cross-cutting review (folded into commit `aeff5cb`):** `apps/api/src/db/client.ts`'s `createDbClient()` applies `transform: { column: postgres.toCamel }` unconditionally — every SELECT returns camelCase keys. The KB module uses snake_case end-to-end (matching the DDL), so this would silently break every API response (`external_id` → `undefined`, etc.) in prod. Unit tests don't catch it because the fake DB bypasses the transform. **Fix:** added a `transform?: false` opt-out to `DbClientOptions`; the KB pool calls `createDbClient({ transform: false, max: 5 })`. Lesson for future batches: any new feature that uses snake_case end-to-end needs `transform: false`; any opt-in integration test that exists should be run at least once locally before opening the PR — otherwise the SQL→TS contract is unverified.
+
 ---
 
 ## File map
