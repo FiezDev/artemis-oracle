@@ -269,13 +269,35 @@ NEW_MAIN_TIP=$(awk -v old="$PRE_MAIN_TIP" '$1 == old { print $2 }' .git/filter-r
 log_info "post-scrub develop tip (rewritten): ${NEW_DEVELOP_TIP:-<unchanged>}"
 log_info "post-scrub main tip    (rewritten): ${NEW_MAIN_TIP:-<unchanged>}"
 
-# Position local branches at the rewritten tips
-if [[ -n "$NEW_DEVELOP_TIP" ]]; then
-  run "git branch -f '$DEVELOP_BRANCH' '$NEW_DEVELOP_TIP'"
-fi
-if [[ -n "$NEW_MAIN_TIP" ]]; then
-  run "git branch -f '$MAIN_BRANCH' '$NEW_MAIN_TIP'"
-fi
+# Position local branches at the rewritten tips.
+# filter-repo updates refs in-place, so usually develop/main are already at
+# the new tips. We only need to move them if they differ. For the currently
+# checked-out branch, git refuses `git branch -f` even on a no-op move, so
+# we explicitly skip when already-at-target.
+move_branch_if_needed() {
+  local branch="$1" target="$2"
+  if [[ -z "$target" ]]; then
+    log_info "$branch: no rewritten tip in commit-map (unchanged)"
+    return 0
+  fi
+  local current
+  current="$(git rev-parse --verify "$branch" 2>/dev/null || echo "")"
+  if [[ "$current" == "$target" ]]; then
+    log_info "$branch: already at $target (no-op)"
+    return 0
+  fi
+  local head_branch
+  head_branch="$(git symbolic-ref --short -q HEAD 2>/dev/null || echo "")"
+  if [[ "$head_branch" == "$branch" ]]; then
+    # Branch is checked out — must use reset --hard, not branch -f
+    run "git reset --hard '$target'"
+  else
+    run "git branch -f '$branch' '$target'"
+  fi
+}
+
+move_branch_if_needed "$DEVELOP_BRANCH" "$NEW_DEVELOP_TIP"
+move_branch_if_needed "$MAIN_BRANCH" "$NEW_MAIN_TIP"
 
 # Restore disk file again (filter-repo may have wiped working tree)
 if [[ ! -f "$FILE_TO_SCRUB" ]]; then
