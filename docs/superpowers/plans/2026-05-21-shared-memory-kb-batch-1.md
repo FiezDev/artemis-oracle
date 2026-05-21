@@ -121,9 +121,11 @@ fastapi==0.115.4
 uvicorn[standard]==0.32.0
 pydantic==2.9.2
 sentence-transformers==3.3.1
-# Test-only
+# Test-only — numpy is pinned because tests fully mock sentence-transformers,
+# so the transitive numpy from sentence-transformers isn't available.
 pytest==8.3.3
 httpx==0.27.2
+numpy==2.1.3
 ```
 
 - [ ] **Step 2: Create the .env.example**
@@ -258,11 +260,12 @@ def test_embed_missing_field(client):
 cd /home/bjgdr/dev-personal/jira-fetch/apps/memory-embed
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/pip install numpy  # used in the test fixture
 .venv/bin/pytest -v
 ```
 
 Expected: tests collected, all fail with `ModuleNotFoundError: No module named 'embed_service'` (or `ImportError`).
+
+**Note:** `requirements.txt` already pins `numpy` in the test-only section, so no separate install is needed. If your `python3` is 3.14+ and `pip install` fails on `pydantic-core` (no wheels yet), retry with `python3.12 -m venv .venv` (or any 3.10-3.13).
 
 - [ ] **Step 3: Commit (failing tests as documentation of contract)**
 
