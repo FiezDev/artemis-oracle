@@ -38,6 +38,11 @@ Get `KB_API_KEY` from the team's secret store. Restart Claude Code so the MCP se
 mkdir -p ~/.config/kb
 cp /home/bjgdr/oracle/artemis-oracle/skills/kb/config.example.json ~/.config/kb/config.json
 # Optional: edit the allowlist + thresholds for your workflow.
+
+# Create the bearer-token file (path referenced from config.token_ref).
+# Get the KB_API_KEY from the team's secret store (or ask the box admin).
+umask 077  # ensures the new file is mode 600
+echo 'paste-your-KB_API_KEY-here' > ~/.config/kb/token
 ````
 
 ### 4. Verify

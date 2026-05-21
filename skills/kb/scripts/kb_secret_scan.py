@@ -10,8 +10,6 @@ Returns JSON on stdout: {"rejected": [{"idx": N, "reason": "<rule>"}]}
 Rejects (never redacts) any chunk that:
 - matches one of the regex patterns in --patterns
 - contains an env-style KEY=value where the value clears the entropy bar
-- contains any single substring (length >= min_length_to_check) whose
-  Shannon entropy exceeds the global threshold
 """
 from __future__ import annotations
 

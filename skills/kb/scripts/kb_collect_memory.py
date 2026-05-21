@@ -65,7 +65,18 @@ def _derive_title(rel_path: str, body: str) -> str:
 
 
 def _iso_to_epoch(iso: str) -> float:
-    return dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc).timestamp()
+    """Tolerant ISO date parser. Accepts:
+    - 'YYYY-MM-DD'
+    - 'YYYY-MM-DDTHH:MM:SSZ'
+    - 'YYYY-MM-DDTHH:MM:SS.ffffffZ' (datetime.isoformat() output)
+    """
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%d"):
+        try:
+            parsed = dt.datetime.strptime(iso, fmt)
+            return parsed.replace(tzinfo=dt.timezone.utc).timestamp()
+        except ValueError:
+            continue
+    raise ValueError(f"Cannot parse ISO date: {iso!r}")
 
 
 def collect(root: Path, globs: list[str], scope: str, scope_tags: dict[str, list[str]], since: str | None) -> list[dict[str, Any]]:

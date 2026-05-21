@@ -1,5 +1,6 @@
 {
   "api_url": "http://43.208.150.191:6501",
+  "owner_email": "you@example.com",
   "mcp_server_alias": "jira-fetch-kb",
   "token_ref": "file:~/.config/kb/token",
   "allowlist": {

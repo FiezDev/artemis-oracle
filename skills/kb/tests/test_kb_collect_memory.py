@@ -84,3 +84,22 @@ def test_external_id_is_relative_path(tmp_path):
 def test_no_globs_match_returns_empty(tmp_path):
     out = _run(tmp_path, ["does/not/exist/**/*.md"], "mobileai", None, {"mobileai": ["mobileai"]})
     assert out["candidates"] == []
+
+
+def test_since_cursor_accepts_date_only_and_microseconds(tmp_path):
+    """Reviewer C1: --since must work with bare YYYY-MM-DD and with
+    datetime.isoformat()+'Z' (microseconds), not just the strict
+    %Y-%m-%dT%H:%M:%SZ format used in the other tests."""
+    new = tmp_path / "ψ" / "memory" / "learnings" / "a.md"
+    _write(new, "---\nrepo: mobileai\n---\nbody", mtime_iso="2026-05-22T00:00:00Z")
+
+    # Date-only: should not crash; should include the file (mtime newer than 2026-05-15)
+    out = _run(tmp_path, ["ψ/memory/learnings/**/*.md"], "mobileai",
+               since="2026-05-15", scope_tags={"mobileai": ["mobileai"]})
+    assert len(out["candidates"]) == 1
+
+    # Microsecond ISO: should not crash; should include the file
+    out = _run(tmp_path, ["ψ/memory/learnings/**/*.md"], "mobileai",
+               since="2026-05-15T00:00:00.123456Z",
+               scope_tags={"mobileai": ["mobileai"]})
+    assert len(out["candidates"]) == 1
