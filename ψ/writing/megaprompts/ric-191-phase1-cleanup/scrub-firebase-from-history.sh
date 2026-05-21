@@ -7,7 +7,9 @@
 #   ./scrub-firebase-from-history.sh                # full interactive run
 #   ./scrub-firebase-from-history.sh --dry-run      # preview, no changes
 #   ./scrub-firebase-from-history.sh --yes          # non-interactive (skip prompts)
-#   ./scrub-firebase-from-history.sh --yes --upstream  # also force-push to upstream/go-thailand
+#
+# Target: ONLY the `origin` remote (Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API).
+# The go-thailand/Rice-Guard-API repo is NOT touched by this script.
 #
 # Safety: NEVER does anything destructive without first creating:
 #   1. A local-disk copy of the Firebase JSON (so you can still use it for RIC-301)
@@ -16,7 +18,7 @@
 #
 # After the script:
 #   - Local: `develop` and `main` point at filter-repo-rewritten history
-#   - Remote: same on origin, with backup/* branches preserving the pre-scrub state
+#   - Remote (origin only): same, with backup/* branches preserving the pre-scrub state
 #   - On disk: Firebase JSON preserved at ${BACKUP_DIR}/riceguard-sentinel-firebase-adminsdk-fbsvc-cd578b991e.json
 #
 
@@ -29,11 +31,12 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$HOME/dev-work/RG/Rice-Guard-API}"
 FILE_TO_SCRUB="riceguard-sentinel-firebase-adminsdk-fbsvc-cd578b991e.json"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/secret/ric308-backup-$(date +%Y%m%d-%H%M%S)}"
-ORIGIN_REMOTE="${ORIGIN_REMOTE:-origin}"
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
+ORIGIN_REMOTE="${ORIGIN_REMOTE:-origin}"        # Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API
 DEVELOP_BRANCH="${DEVELOP_BRANCH:-develop}"
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+# Expected URL — script aborts if origin points anywhere else (e.g. go-thailand)
+EXPECTED_ORIGIN_URL_PATTERN="Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API"
 
 # ────────────────────────────────────────────────────────────────────────────
 # Flags
@@ -41,14 +44,12 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 DRY_RUN=false
 ASSUME_YES=false
-DO_UPSTREAM=false
 DO_CLEANUP_BRANCHES=false
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run)            DRY_RUN=true ;;
     --yes|-y)             ASSUME_YES=true ;;
-    --upstream)           DO_UPSTREAM=true ;;
     --cleanup-branches)   DO_CLEANUP_BRANCHES=true ;;
     --help|-h)
       sed -n '4,30p' "$0"
@@ -79,6 +80,10 @@ log_err()  { echo "  $(c_red "✗") $1" >&2; }
 
 confirm() {
   local prompt="$1"
+  if $DRY_RUN; then
+    log_info "dry-run auto-yes: $prompt"
+    return 0
+  fi
   if $ASSUME_YES; then
     log_info "auto-yes: $prompt"
     return 0
@@ -121,18 +126,20 @@ if [[ -n "$(git status --porcelain)" ]]; then
   confirm "continue anyway?" || abort "aborted by user"
 fi
 
+# Guard: refuse to run if origin points at go-thailand or any other unexpected repo
+ACTUAL_ORIGIN_URL="$(git remote get-url "$ORIGIN_REMOTE" 2>/dev/null || true)"
+if [[ -z "$ACTUAL_ORIGIN_URL" ]]; then
+  abort "$ORIGIN_REMOTE remote is not configured. Run: git remote add origin https://github.com/$EXPECTED_ORIGIN_URL_PATTERN.git"
+fi
+if [[ "$ACTUAL_ORIGIN_URL" != *"$EXPECTED_ORIGIN_URL_PATTERN"* ]]; then
+  log_err "$ORIGIN_REMOTE points to: $ACTUAL_ORIGIN_URL"
+  log_err "expected to contain:      $EXPECTED_ORIGIN_URL_PATTERN"
+  abort "refusing to run against a different repo than Mobile-AI-Co-Ltd-0105567015509/Rice-Guard-API"
+fi
+log_ok "$ORIGIN_REMOTE → $ACTUAL_ORIGIN_URL"
+
 log_info "fetching latest from $ORIGIN_REMOTE..."
 run "git fetch $ORIGIN_REMOTE $DEVELOP_BRANCH $MAIN_BRANCH"
-
-if $DO_UPSTREAM; then
-  if git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
-    log_info "fetching from $UPSTREAM_REMOTE..."
-    run "git fetch $UPSTREAM_REMOTE $DEVELOP_BRANCH $MAIN_BRANCH"
-  else
-    log_warn "$UPSTREAM_REMOTE remote not configured; skipping upstream operations"
-    DO_UPSTREAM=false
-  fi
-fi
 
 log_info "remote-tracking state:"
 git for-each-ref --format='    %(refname:short) → %(objectname:short) %(committerdate:relative)' refs/remotes/$ORIGIN_REMOTE/$DEVELOP_BRANCH refs/remotes/$ORIGIN_REMOTE/$MAIN_BRANCH 2>/dev/null
@@ -220,10 +227,12 @@ if [[ -d .git/filter-repo ]]; then
   run "mv .git/filter-repo '$STALE_STATE'"
 fi
 
-# Show current state for the file
-COMMITS_WITH_FILE_BEFORE=$(git log --all --oneline -- "$FILE_TO_SCRUB" 2>/dev/null | wc -l | tr -d ' ')
-BLOB_HASH_BEFORE=$(git rev-list --all --objects 2>/dev/null | awk -v f="$FILE_TO_SCRUB" '$2 == f { print $1; exit }')
-log_info "commits referencing $FILE_TO_SCRUB before: $COMMITS_WITH_FILE_BEFORE"
+# Show current state for the file (best-effort logging, never fail the script)
+set +o pipefail
+COMMITS_WITH_FILE_BEFORE=$(git log --all --oneline -- "$FILE_TO_SCRUB" 2>/dev/null | wc -l | tr -d ' ' || echo "?")
+BLOB_HASH_BEFORE=$(git rev-list --all --objects 2>/dev/null | grep "$FILE_TO_SCRUB" | head -1 | awk '{print $1}' || true)
+set -o pipefail
+log_info "commits referencing $FILE_TO_SCRUB before: ${COMMITS_WITH_FILE_BEFORE:-?}"
 log_info "blob hash before: ${BLOB_HASH_BEFORE:-<none>}"
 
 # Save the current commits-of-interest for verification post-scrub
@@ -306,37 +315,11 @@ run "git push --force-with-lease '$ORIGIN_REMOTE' '$MAIN_BRANCH'"
 log_ok "force-pushed $MAIN_BRANCH to $ORIGIN_REMOTE"
 
 # ────────────────────────────────────────────────────────────────────────────
-# Phase 4: Optional upstream mirror
-# ────────────────────────────────────────────────────────────────────────────
-
-if $DO_UPSTREAM; then
-  log_step "Phase 4 — mirror scrub to $UPSTREAM_REMOTE"
-  log_warn "this pushes the SAME rewritten history to upstream (go-thailand)"
-  confirm "proceed with force-push to $UPSTREAM_REMOTE?" || {
-    log_warn "skipping upstream"
-    DO_UPSTREAM=false
-  }
-
-  if $DO_UPSTREAM; then
-    # Create matching backup branches on upstream
-    log_info "creating backup branches on $UPSTREAM_REMOTE..."
-    run "git push '$UPSTREAM_REMOTE' '$UPSTREAM_REMOTE/$DEVELOP_BRANCH:refs/heads/$BACKUP_DEVELOP'" || log_warn "backup push to upstream failed (may already exist or no permission)"
-    run "git push '$UPSTREAM_REMOTE' '$UPSTREAM_REMOTE/$MAIN_BRANCH:refs/heads/$BACKUP_MAIN'" || log_warn "backup push to upstream failed"
-
-    run "git push --force-with-lease '$UPSTREAM_REMOTE' '$DEVELOP_BRANCH'"
-    log_ok "force-pushed $DEVELOP_BRANCH to $UPSTREAM_REMOTE"
-
-    run "git push --force-with-lease '$UPSTREAM_REMOTE' '$MAIN_BRANCH'"
-    log_ok "force-pushed $MAIN_BRANCH to $UPSTREAM_REMOTE"
-  fi
-fi
-
-# ────────────────────────────────────────────────────────────────────────────
-# Phase 5: Optional stale-branch cleanup
+# Phase 4: Optional stale-branch cleanup (listing only)
 # ────────────────────────────────────────────────────────────────────────────
 
 if $DO_CLEANUP_BRANCHES; then
-  log_step "Phase 5 — list stale branches on $ORIGIN_REMOTE that still contain the file"
+  log_step "Phase 4 — list stale branches on $ORIGIN_REMOTE that still contain the file"
   log_warn "this is read-only; deletion is manual."
   STALE=$(git ls-remote "$ORIGIN_REMOTE" 'refs/heads/*' 2>/dev/null | awk '{print $2}' | grep -v "^refs/heads/$DEVELOP_BRANCH$" | grep -v "^refs/heads/$MAIN_BRANCH$" | grep -v "^refs/heads/backup/")
   echo "    branches still on remote (may have file in their history; manually delete with 'git push $ORIGIN_REMOTE --delete <branch>' if abandoned):"
@@ -344,7 +327,7 @@ if $DO_CLEANUP_BRANCHES; then
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-# Phase 6: Final summary
+# Phase 5: Final summary
 # ────────────────────────────────────────────────────────────────────────────
 
 log_step "Done"
