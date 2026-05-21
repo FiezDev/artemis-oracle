@@ -1,0 +1,26 @@
+{
+  "api_url": "http://43.208.150.191:6501",
+  "owner_email": "you@example.com",
+  "mcp_server_alias": "jira-fetch-kb",
+  "token_ref": "file:~/.config/kb/token",
+  "allowlist": {
+    "memory_globs": [
+      "ψ/memory/learnings/**/*.md",
+      "ψ/memory/retrospectives/**/*.md"
+    ],
+    "scope_tags": {
+      "mobileai": ["mobileai", "rice-guard", "ric-"],
+      "gothailand": ["gothailand", "go-thailand"]
+    }
+  },
+  "classifier": {
+    "threshold": 0.7
+  },
+  "secret_scan": {
+    "action": "reject",
+    "extra_patterns": []
+  },
+  "ingest": {
+    "max_chunks_per_run": 50
+  }
+}
