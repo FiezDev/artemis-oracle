@@ -407,13 +407,23 @@ These are the only items where the spec defers to user input:
    `allowlist.jira_project_keys.gothailand` config slot.
 2. **`gothailand` GitHub org(s)** — fill
    `allowlist.github_orgs.gothailand`.
-3. **`jirafetch-api` port** — currently parameterised as
-   `<jirafetch-api-port>`; the existing systemd unit / Hono entry will tell
-   us the exact value (likely 3000 or 3001).
-4. **`jira-fetch-host`** — the host name behind nginx. Existing vhost
-   config will tell us.
-5. **Whether `db/migrations` numbering** clashes — pick the next free
-   `00NN_` prefix at implementation time.
+3. **`jirafetch-api` port** — confirmed during implementation as **6501**
+   (internal). External access is via nginx on the EC2.
+4. **`jira-fetch-host`** — confirmed as **43.208.150.191** (Tools EC2,
+   ap-southeast-1 region per the IP). Hostname behind nginx TBD.
+5. **Migration path correction** — actual path is `apps/api/db/migrations/`
+   not `db/migrations/`. Migrations use `-- migrate:up` / `-- migrate:down`
+   markers (dbmate-style regex parser in `apps/api/db/migrate.ts`).
+
+**Prerequisite discovered during batch 1 deploy (2026-05-21):**
+
+6. **`pgvector` apt package must be installed on the Postgres server**
+   *before* the first migration is applied. On Ubuntu + PG14:
+   `sudo apt-get install -y postgresql-14-pgvector` (substitute the right
+   PG major version for your box). Without it, `CREATE EXTENSION vector`
+   fails with `could not open extension control file
+   ".../<pgver>/extension/vector.control"`. This is a one-time host setup
+   step — not solvable from a migration file alone.
 
 None of these block design approval; they're config values to look up before
 implementation starts.

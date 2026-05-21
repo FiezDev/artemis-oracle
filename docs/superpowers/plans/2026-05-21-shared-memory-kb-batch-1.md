@@ -20,6 +20,8 @@
 
 **Note on spec drift:** Spec §9.1 / §11 said migrations live in `db/migrations/`; the actual jira-fetch path is `apps/api/db/migrations/`. This plan uses the correct path. Spec §9.2 said `User=ec2-user`; actual EC2 user is `runner` and root is `/opt/jira-fetch/`. Both corrections are reflected below.
 
+**⚠ Prerequisite (must be done BEFORE merging this batch):** The Postgres server on the EC2 must have the `pgvector` extension's apt package installed. PG14 on Ubuntu → `sudo apt-get install -y postgresql-14-pgvector` (substitute the right PG major version for your box). Without this, `CREATE EXTENSION vector` will fail with `could not open extension control file ".../vector.control"` and the deploy.yml migration step will abort (caught here the first time — see `gh run view <id>` for the merge of PR #1). Re-running `bun db:migrate` manually after installing the apt package will apply the migration; deploy.yml's auto-detect only fires when the migration file itself changes, so a manual replay is needed after the one-time apt install.
+
 ---
 
 ## File map
