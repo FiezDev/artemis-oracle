@@ -1,0 +1,58 @@
+[
+    {
+        "id": "5865f062-ff0a-4f77-8709-33c9eb0c43bc",
+        "body": "AlphaEvolve started as a Gemini-powered coding agent that could solve open math problems. A year later, it's embedded across Google's critical infrastructure. It designed quantum circuits for the Willow processor with 10x lower error rates. It optimized Google Spanner's compaction heuristics, cutting write amplification by 20%. It discovered cache replacement policies in just two days — work that previously took teams months.\n\nThe system now tackles problems across health research (DeepConsensus with PacBio), power grid optimization (AC Optimal Power Flow), and natural disaster prediction with Earth AI. It's even proving new bounds on Erdos problems and the Traveling Salesman Problem.\n\nGoogle Cloud is now bringing AlphaEvolve to enterprise clients including Klarna, Schrodinger, and WPP. The key insight: AlphaEvolve doesn't just generate code — it evolves entire algorithms, iterating through candidate solutions using LLM-driven mutation and evaluation loops. For Thai developers and researchers, this signals a shift where AI doesn't just assist coding — it redesigns the algorithms themselves.",
+        "hook": "Google DeepMind's AlphaEvolve just upgraded from research toy to production tool — and it's already reshaping Google's infrastructure from the inside.",
+        "title": "AlphaEvolve: The AI That Writes Better Algorithms Than Humans",
+        "sourceTimestamp": "25:19",
+        "suggestedHashtags": [
+            "#AlphaEvolve",
+            "#GoogleDeepMind",
+            "#AlgorithmDesign",
+            "#AIResearch",
+            "#QuantumComputing"
+        ]
+    },
+    {
+        "id": "1d54d187-224c-445f-8412-5081d5e08f18",
+        "body": "OpenAI's GPT-Realtime-2 is the first voice model with GPT-5-level reasoning baked in. It doesn't just transcribe and respond — it understands context mid-conversation, handles interruptions gracefully, and can call tools while keeping the dialogue flowing. New features include 'preambles' (short filler phrases like 'let me check that' while it processes) and the ability to reason through complex multi-step requests in real time.\n\nAlongside it, GPT-Realtime-Translate handles live translation from 70+ input languages into 13 output languages at speaking pace. GPT-Realtime-Whisper adds streaming speech-to-text. Together they cover three patterns: voice-to-action (talk to apps), systems-to-voice (apps talk to you), and voice-to-voice (cross-language conversations).\n\nCompanies like Zillow, Deutsche Telekom, and Priceline are already building on these models. For Thai businesses, this opens up real-time multilingual customer support, voice-driven booking systems, and hands-free AI assistants that can actually complete tasks instead of just answering questions.",
+        "hook": "OpenAI just dropped three new voice models — and the flagship one brings GPT-5-class reasoning to live phone calls.",
+        "title": "GPT Realtime 2: Voice AI That Actually Reasons While You Talk",
+        "sourceTimestamp": "18:27",
+        "suggestedHashtags": [
+            "#GPTRealtime2",
+            "#OpenAI",
+            "#VoiceAI",
+            "#RealtimeTranslation",
+            "#AIVoice"
+        ]
+    },
+    {
+        "id": "8bd1c830-0db7-4d9a-ab8d-6c31ef6e04de",
+        "body": "Genesis AI released GENE-26.5, their first robotic foundation model designed to push general-purpose manipulation toward human-level capability. Unlike navigation-focused robots that avoid contact, GENE-26.5 treats physical interaction as the core task. It demonstrates dexterous skills across cooking, lab automation, Rubik's cube solving, smoothie making, wire harnessing, multi-object grasping, and piano playing — all using the same model, hardware platform, and control stack.\n\nThe key breakthrough is treating manipulation as a full-stack system problem, not just an AI training problem. Genesis co-designed the hardware, control middleware, data pipeline, and model together from the ground up. They developed a teleoperation glove system to capture high-fidelity human hand data at scale, bridging the embodiment gap between human demonstrations and robot execution.\n\nThe result: a single foundation model that generalizes across contact-rich, long-horizon tasks that previously required separate specialized systems. This approach contrasts with most robotics companies that focus on locomotion first. Genesis bets that if you solve manipulation, everything else follows.",
+        "hook": "Genesis AI's first robotic foundation model can cook, solve a Rubik's cube, play piano, and make smoothies — all with the same model.",
+        "title": "GENE-26.5: A Robot That Cooks, Plays Piano, and Solves Rubik's Cubes",
+        "sourceTimestamp": "22:18",
+        "suggestedHashtags": [
+            "#GENE26",
+            "#Robotics",
+            "#HumanoidRobot",
+            "#AIManipulation",
+            "#GenesisAI"
+        ]
+    },
+    {
+        "id": "584d5602-7e33-44ae-ad42-fbf8a2bd40f1",
+        "body": "HiDream-O1-Image takes a radically different approach to image generation. Instead of the standard pipeline — a VAE for latent encoding, a separate text encoder, and a diffusion model — it uses a single Pixel-level Unified Transformer (UiT) that natively processes raw pixels, text, and task conditions in one shared token space.\n\nThe model supports text-to-image generation, image editing, and subject-driven personalization at resolutions up to 2048x2048. It's built on a Qwen3-VL architecture, licensed under MIT, and the Dev variant is already open-sourced on HuggingFace with an integrated prompt refiner.\n\nWhat makes this interesting for the AI image community: by removing the VAE bottleneck, the model avoids the information loss that comes with latent compression. Early benchmarks show competitive quality against closed-source alternatives. The editing pipeline also supports layout and skeleton conditioning, giving creators fine-grained control over composition. For developers working on AI image tools, this is one of the most architecturally innovative open-source options available right now.",
+        "hook": "HiDream's new open-source image model ditches VAEs and separate text encoders — everything runs in one unified transformer.",
+        "title": "HiDream-O1-Image: Open-Source Image Model Without VAEs",
+        "sourceTimestamp": "03:24",
+        "suggestedHashtags": [
+            "#HiDreamO1",
+            "#ImageGeneration",
+            "#OpenSourceAI",
+            "#DiffusionModels",
+            "#AITools"
+        ]
+    }
+]

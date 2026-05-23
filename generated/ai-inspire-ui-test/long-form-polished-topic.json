@@ -1,0 +1,16 @@
+[
+    {
+        "body": "IBM Research เปิดตัว MAMMAL (Molecular Aligned Multi-Modal Architecture and Language) โมเดล foundation ข้าม modalities ตัวแรกที่จับ small molecules, โปรตีน, และ gene expression ใส่ shared embedding space เดียวกัน เทรนด้วยข้อมูลชีวภาพ 2 พันล้านตัวอย่าง ใช้ modular tokenizer แยก sub-tokenizer ตามประเภทข้อมูล ทำให้เรียนรู้ความสัมพันธ์ข้ามโดเมนที่โมเดลมองข้ามไม่ได้ ความแปลกคือเลข continuous values อย่าง binding affinity หรือ IC50 ไม่ต้อง binning แต่ project เข้า embedding ตรงๆ เลย\n\n• SOTA ใน 9 จาก 11 benchmarks ครอบคลุม drug safety, efficacy, binding affinity, antibody design\n• เอาชนะ MoLFormer (เทรนด้วย SMILES 1.1B) ที่ BBBP +2.2% AUROC และ ClinTox +4% AUROC ทั้งที่ MAMMAL กระจาย capacity ไปหลาย modalities\n• Drug repurposing: ทำนาย Carfilzomib (ยา myeloma ที่ FDA อนุมัติ) ว่าทรงพลังที่สุดต่อ solid tumors ใน 805 cell lines แล็บยืนยันด้วย CellTiter-Glo assay ตรงตามลำดับที่ทำนาย\n• เอาชนะ AlphaFold 3 ที่ 5 จาก 7 antibody-binding targets โดยเฉพาะ targets ที่มี intrinsically disordered regions (30-40% ของ human proteome)\n• CDR infilling: สร้าง antibody sequences ใหม่ ปรับปรุง amino acid recovery ที่ CDRH3 (ยากที่สุด) เพิ่มขึ้น 19%\n• Opensource Apache 2.0 ทั้ง model และ code บน HuggingFace และ GitHub\n\n#MAMMAL #AIDrugDiscovery #AlphaFold #BiomedicalAI #DrugRepurposing #FoundationModel\n\nที่มา: Nature npj Drug Discovery, HuggingFace, Wikipedia/Carfilzomib",
+        "hook": "โมเดล AI ตัวเดียวจาก IBM เอาชนะ AlphaFold 3 แถมทำนายยาต้านมะเร็งได้แม่นยำจนห้องแล็บยืนยัน",
+        "title": "MAMMAL: IBM model ที่อ่านชีววิทยาทุกรูปแบบในโมเดลเดียว",
+        "ctaSuggestion": null,
+        "suggestedHashtags": [
+            "#MAMMAL",
+            "#AIDrugDiscovery",
+            "#AlphaFold",
+            "#BiomedicalAI",
+            "#DrugRepurposing",
+            "#FoundationModel"
+        ]
+    }
+]

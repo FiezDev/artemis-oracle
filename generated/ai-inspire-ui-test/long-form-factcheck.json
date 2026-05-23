@@ -1,0 +1,143 @@
+[
+    {
+        "data": "## Fact-check: MAMMAL - Molecular Aligned Multi-Modal Architecture and Language\n\n13 claims extracted and verified against the Nature paper (npj Drug Discovery, 04 May 2026). 12 supported, 1 unverified ('contradicting decades of expert consensus' — softened in body). Overall confidence: 0.70. Key sources: Nature paper, HuggingFace model page, Wikipedia/Carfilzomib.",
+        "from": "nova",
+        "task": "nova-factcheck-expand",
+        "items": [
+            {
+                "body": "MAMMAL (Molecular Aligned Multi-Modal Architecture and Language), published in npj Drug Discovery in May 2026, is a cross-modal foundation model from IBM Research designed to tackle the full drug discovery pipeline in a single unified framework. It was pre-trained on 2 billion biological samples spanning three modalities — small molecules (encoded as SMILES strings), protein and antibody sequences, and gene expression profiles — all mapped into one shared sequence representation via a modular tokenizer. This tokenizer assigns distinct sub-tokenizers to each entity type, enabling the model to learn cross-domain relationships that single-modality tools inherently miss.\n\nThe model natively supports classification, regression, and generative tasks. A key architectural innovation is its continuous embedding layer for numerical values — rather than binning or digitizing scalar inputs like binding affinities or IC50 concentrations, MAMMAL projects them directly into the embedding space, preserving quantitative precision.\n\nAcross 11 established benchmarks covering target identification, drug safety, efficacy prediction, binding affinity, and antibody design, MAMMAL achieves state-of-the-art performance on nine tasks and competitive results on the remaining two. On blood-brain barrier penetration (BBBP) and clinical toxicity (ClinTox) — two safety-critical benchmarks from MoleculeNet — MAMMAL surpasses MoLFormer, a model trained on 1.1 billion small-molecule SMILES strings, by 2.2% and 4% in AUROC respectively. This is notable because MoLFormer specializes exclusively in small molecules, while MAMMAL spreads its capacity across proteins, genes, and chemistry — yet still wins on MoLFormer's home turf.\n\nOne of the most striking results came from a drug repurposing experiment. Researchers tested MAMMAL on four drugs absent from its training data — Carfilzomib, Nintedanib, Infigratinib, and Vemurafenib — across 805 cancer cell lines in the GDSC database. Three of these drugs had no structurally similar compounds in the training set. MAMMAL predicted that Carfilzomib, a proteasome inhibitor FDA-approved only for multiple myeloma (a blood cancer), would be the most potent drug across diverse solid tumor cell lines. Wet-lab experiments using the same CellTiter-Glo assay protocol as GDSC confirmed this exact potency ranking. The result is surprising because Carfilzomib has historically shown limited efficacy in solid tumors (UNVERIFIED: the claim that this \"contradicts decades of expert consensus\" goes beyond what the paper states), and it suggests a potential new avenue for drug repurposing that warrants further clinical investigation.\n\nOn the biologic side, MAMMAL was benchmarked against AlphaFold 3 (AF3) for antibody–antigen binding prediction. While AF3 uses structural prediction confidence scores as a proxy for binding likelihood, MAMMAL operates purely on sequences. Across seven antigen targets — including HER2, albumin, EGFR, CD206, TBG, TNFα, and VWF — fine-tuned MAMMAL significantly outperformed AF3 on five of seven. The gap was largest on targets with intrinsically disordered regions (IDRs), which comprise 30–40% of the human proteome and are known to challenge structure-based models. AF3 struggled particularly with IDR-rich therapeutic targets like EGFR and HER2, where it showed near-random discriminative performance.\n\nFor antibody design, MAMMAL was fine-tuned on the SAbDab dataset to perform CDR infilling — predicting the amino acid sequences of masked complementarity-determining regions given an antigen and the antibody's framework regions. It achieved superior amino acid recovery across all CDRs compared to prior methods, with a remarkable 19% improvement on CDRH3, the most variable and hardest-to-predict region.\n\nThe pretrained model and code are publicly available under the Apache 2.0 license on HuggingFace (ibm-research/biomed.omics.bl.sm.ma-ted-458m) and GitHub (BiomedSciAI/biomed-multi-alignment), making it one of the most open and comprehensive biomedical foundation models to date.",
+                "hook": "One AI model just beat AlphaFold 3, predicted a cancer breakthrough, and it reads biology like text.",
+                "title": "MAMMAL: The AI Model That Understands All of Biology at Once",
+                "sourceUrl": "https://www.youtube.com/watch?v=s3rNDndvav0",
+                "confidence": 0.7,
+                "factChecks": [
+                    {
+                        "claim": "MAMMAL published in Nature",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Pre-trained on 2 billion biological samples",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Modular tokenizer for SMILES, gene expression, protein sequences",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "11 benchmarks, state-of-the-art results",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Beat MoLFormer on BBBP and ClinTox",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.9
+                    },
+                    {
+                        "claim": "Tested on 4 drugs against 805 cell lines",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.9
+                    },
+                    {
+                        "claim": "Carfilzomib predicted most potent against solid tumors",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4",
+                            "https://en.wikipedia.org/wiki/Carfilzomib"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Contradicting decades of expert consensus",
+                        "sources": [
+                        ],
+                        "verdict": "unverified",
+                        "confidence": 0.7
+                    },
+                    {
+                        "claim": "Lab experiments confirmed the prediction",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Outperformed AlphaFold 3 on 5 of 7 antibody-binding targets",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.95
+                    },
+                    {
+                        "claim": "Intrinsically disordered regions resist static 3D modeling",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.9
+                    },
+                    {
+                        "claim": "Generated new antibody sequences, 19% improvement on CDRH3",
+                        "sources": [
+                            "https://www.nature.com/articles/s44386-026-00047-4"
+                        ],
+                        "verdict": "supported",
+                        "confidence": 0.9
+                    }
+                ],
+                "postFormat": "long_story",
+                "videoTitle": "The biggest AI breakthrough in medicine & drug discovery",
+                "sourceTopics": [
+                    "MAMMAL: The AI Model That Understands All of Biology at Once"
+                ],
+                "ctaSuggestion": "Which existing drug do you think deserves a second look against a different disease?",
+                "sourcesReviewed": [
+                    "https://www.nature.com/articles/s44386-026-00047-4",
+                    "https://huggingface.co/ibm-research/biomed.omics.bl.sm.ma-ted-458m",
+                    "https://github.com/BiomedSciAI/biomed-multi-alignment",
+                    "https://en.wikipedia.org/wiki/Carfilzomib"
+                ],
+                "suggestedHashtags": [
+                    "#AIDrugDiscovery",
+                    "#MAMMAL",
+                    "#AlphaFold",
+                    "#BiomedicalAI",
+                    "#DrugRepurposing",
+                    "#FoundationModel"
+                ]
+            }
+        ],
+        "usage": {
+            "total_tokens": 15500,
+            "prompt_tokens": 12000,
+            "completion_tokens": 3500
+        },
+        "starttime": "2026-05-23T19:16:05.627Z",
+        "reviewItemIds": [
+            "601b0c0d-fca2-4f42-8a3b-03ec47254457"
+        ]
+    }
+]
