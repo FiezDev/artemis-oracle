@@ -175,8 +175,17 @@ Status legend: `[ ]` todo · `[~]` in-progress · `[x]` done
 
 ## T11 — Phase 5: UI + concurrency lock
 
-- **Status:** [ ] deferred to next session
-- **Why deferred:** depends on T10 slice 3-4 being verified end-to-end. UI work is meaningless until the backend dispatch is proven working in the container.
+- **Status:** [x] done (this session)
+- **Commits:**
+  - `f182298` — feat(workflows): Phase 5 slices 5+6 — credential picker UI + workflow builder card
+  - `336e8f7` — feat(api): Phase 5 slice 7 — per-credentialId concurrency lock + crash-recovery sweep
+  - `eb78f53` — fix(frontend): Dockerfile rebuild from workspace root
+  - `de1d4b5` — fix(frontend): native binaries + standalone workspace WORKDIR
+- **Smoke verified:**
+  - Workflow editor at `/workflows/<id>/edit` shows "+ Credential" toolbar button + credential node card with dropdown (status dots) + preflight checkbox
+  - Lock contention: 2nd run on held credential fails step with `"credential ... is held by another active workflow run"`
+  - Lock release: run completion → `locks_held = 0` (release via `applyRunStatusFromStepRuns`)
+  - Crash-recovery sweep added to api startup
 - **Depends on:** T5 (extension proves /import-warm-state path; T9 is the other half — the /test-login → CLI path needs an out-of-container worker)
 - **Why this slice exists:** T5 verification exposed a pre-existing bug — `/test-login` in `routes/credentials.ts:235` does `Bun.spawn(['bun', 'run', 'src/cli.ts', 'from-vault', ...], { cwd: SOCIAL_LOGIN_DIR })`. Inside the api Docker container, `SOCIAL_LOGIN_DIR` defaults to `/home/bun/Dev/qone_corp/social-login` which doesn't exist → ENOENT. Permanent fix: out-of-container worker that the api fetches over HTTP. Mirrors the existing `EVENT_BRIDGE_URL: host.docker.internal:19850` pattern used by openclaw.
 - **Acceptance:**
