@@ -469,10 +469,47 @@ Commit: `de1d4b5`
 6. Lock auto-releases on terminal status
 
 Outstanding follow-ups (truly out of scope, none blocking):
-- KEK rotation script (v1 Task 23 — implement when rotation is needed)
-- parkAtGate-style pause for `needs_human` (today fails the step; gate-pause would let workflows resume without re-trigger)
-- Direct platform processes that actually consume `currentCredentialId` (e.g. `direct-post-facebook`) — adds the consumer side of the produce-consume flow we built
-- `drizzle-kit migrate` host esbuild issue (unrelated; legacy migrations are tracked)
+- ~~KEK rotation script~~ ✓ shipped as `dashboard/api/scripts/rotate-kek.ts` + RUNBOOK
+- ~~worker daemon persistence~~ ✓ shipped as launchd plist
+- parkAtGate-style pause for `needs_human` (today fails the step; gate-pause would let workflows resume without re-trigger). Real refactor.
+- Direct platform processes that actually consume `currentCredentialId` (e.g. `direct-post-facebook`) — adds the consumer side of the produce-consume flow. Needs `processExecutor.dispatchIteration` surgery to route through the social-login adapter when `process.adapter='social-login'`. Phase 6 work.
+- ~~`drizzle-kit migrate` host esbuild issue~~ — non-blocking: legacy migrations runner at `bun run src/db/migrate.ts` works perfectly. drizzle-kit chain after it is decorative (no drizzle-generated migrations exist).
+
+---
+
+## 2026-05-23 — Final operations close (KEK rotation + runbook)
+
+Final operations layer:
+
+**Commits:**
+- `137faf1` — ops(api): KEK rotation script + secret rotation runbook
+- `ee25bc1` — feat(social-login): launchd plist for the social-login worker daemon (earlier this session)
+
+**KEK rotation (`dashboard/api/scripts/rotate-kek.ts`):**
+- Implements spec §4.3: per-row transactional rotation via drizzle's implicit autocommit
+- Dry-run by default; --apply to mutate; --verbose for per-row progress
+- Crash-resumable: already-rotated rows stay at v2; rerun picks up remaining v1
+- Dry-run verified against current 4-row v1 set (reports "4 will rotate", no DB mutation)
+
+**Secret rotation runbook (`dashboard/api/scripts/RUNBOOK-secret-rotation.md`):**
+- SERVICE_SECRET path: openssl rand, sed in .env, docker compose restart api, launchctl kickstart -k of the worker, Chrome extension popup re-paste
+- QONE_VAULT_KEY path: dry-run, apply, env swap, restart — with verification queries
+- Both with chmod hygiene notes and dual-leak ordering recommendation
+
+**What I intentionally did NOT do (Phase 6, not Phase 5 leftover):**
+- `parkAtGate` loosening for `needs_human` — would require modifying the gate-handler's nodeType assertion + adding credential-specific resume UI surface. Real refactor.
+- Direct-process adapter routing — `processes.adapter` column is in place but `processExecutor.dispatchIteration` (line 223 of process-executor.ts) doesn't yet branch on it. Wiring the social-login adapter through requires careful surgical injection + tests. Phase 6 work.
+
+**SERVICE_SECRET rotation is NOT executed this session.** The runbook documents the procedure; the user runs it when ready. I leaked the value earlier in this transcript; the runbook covers the rotation steps when the user is ready to do it.
+
+**Phase 5 closed. The vault has a complete day-2 operations surface:**
+- Worker daemon persists across reboots + auto-restarts on crash
+- KEK rotation script + runbook for both secrets
+- Migrations tracked cleanly via the legacy runner
+- Frontend container serves the UI
+- Backend handles every credential operation end-to-end
+
+End of session.
 
 **What you can do RIGHT NOW (no further code needed):**
 - Insert workflow_nodes rows with `node_type='credential'` + `variable_overrides='{"credentialId":"...","preflight":true}'` to add credential gates to any existing workflow. Downstream nodes can read `currentCredentialId` from their merged input.
