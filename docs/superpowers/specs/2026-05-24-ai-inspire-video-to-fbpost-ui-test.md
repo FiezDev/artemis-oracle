@@ -115,8 +115,10 @@ A one-node config patch (`upstream.items` → `upstream` on N4, applied to DB + 
 
 **Root cause (traced 2026-05-24):** the value reaching `ctx.input.transcript` is the **literal string `{upstream.transcript}`** (21 chars), not the transcript. The Format-Decision N2 node carries `variableOverrides: {"transcript":"{upstream.transcript}", "videoTitle":"{videoTitle}", "durationSec":0}` — a `{var}` template the engine **does not interpolate** (same leak class as the dedup `looksLikePlaceholder` guard, `#2026-05-21`). Worse, the Format-Decision producer nodes don't receive `input.upstream` at all (verified: `dedup-video-check` and the others show `upstream=NONE`), so N1's real 31k-char output never reaches N2 by any path. **Not a one-liner** — needs an engine-level data-flow fix (make producer nodes receive their dep outputs, OR write the transcript into run variables after N1, OR add real interpolation). Deferred: can't be validated live until the api rebuild + yt-dlp caption fetch are restored.
 
-### P1 — Gate proliferation makes the Gates dashboard unusable
-Duplicate gate rows accumulate (one set per seed/migration run), e.g. `review`×126, `AI Inspire post review`×47, `AI Inspire — Content Generation review`×42, `AI Inspire — Format Decision review`×41, `AI Inspire Format Decision`×25. The `/gates` page renders **every** card, so the one live pending review is a needle in a haystack of "no pending reviews" cards. Seeds should upsert by stable key; the page should default to "has pending reviews" / dedupe by name.
+### P1 — Gate proliferation makes the Gates dashboard unusable — ✅ FIXED (non-destructive)
+Duplicate gate rows accumulate (one set per seed/migration/test run), e.g. `review`×126, `AI Inspire post review`×47, `AI Inspire — Content Generation review`×42, `AI Inspire — Format Decision review`×41 — **471 total, only 14 wired to a live workflow node**. The `/gates` page rendered every card, burying the one live pending review under a haystack of "no pending reviews" cards.
+
+**Fix (`qone_corp-dashboard-refactor@7589a4c`):** `listGates` gained a `referencedOnly` filter (`EXISTS` a `workflow_node` with this `gate_id`); `GET /gates?referenced=true` exposes it; the dashboard page + `useGates` hook request it. **No rows deleted** — honors "Nothing is Deleted", fully reversible, and a gate with a pending review is always node-wired so none are hidden. Validated against the live DB: **471 → 14 gates, 14 distinct names.** (Orphan-row archival/cleanup left as an optional follow-up.)
 
 ### P1 — Agent-runner reliability
 `nova`/`reel` runner logs are full of `tick error: socket connection closed unexpectedly` / `Unable to connect`, and a long stretch of `the step run/workflow run don't exist in the database` 404s. An orphaned `forge` wakeup has been `running` for 3 h. Each `hermes-cli` step takes **~5 min** and the runner processes wakeups **serially**, so two runs' steps don't parallelize → a 5-step × 2-video pipeline is ~40-50 min wall-clock with no failures.
@@ -124,8 +126,8 @@ Duplicate gate rows accumulate (one set per seed/migration run), e.g. `review`×
 ### P2 — Orphaned `waiting_for_human` step-runs from cancelled/failed parents
 Cancelling/failing a parent run leaves child gate step-runs in `waiting_for_human`, so `GET /gates/:id/runs?active=true` returns stale entries (e.g. a `failed` run from 5/20 and 3 cancelled phase6 tests still showed as "parked"). Cancellation should cascade gate step-runs to `cancelled`.
 
-### P2 — `forceReprocess` accepted but ignored
-See Blockers #2. Either honor the flag in `manual-video` (thread into dedup) or remove the UI affordance.
+### P2 — `forceReprocess` accepted but ignored — ✅ FIXED
+See Blockers #2. **Fix (`qone_corp-dashboard-refactor@ca24119`):** the route now threads `forceReprocess` into run variables, and `dedup-video-check` short-circuits to `{skip:false, forced:true}` before the `hasSeenVideo` lookup (accepts boolean `true` or string `"true"`). Declared on `ManualVideoBodySchema` for the OpenAPI contract. Unit-tested (videoCheck bypass + dedup-not-consulted).
 
 ### P3 — Format-decision rich UI not mounted
 See Blockers #3. `format-decision-gate.tsx` is dead code until wired to a route; the generic panel can't show transcript/thumbnail/suggested-format context.
@@ -156,10 +158,19 @@ Topics generated successfully before the infographic stage (exported to `generat
 
 1. ~~Decide the P0 fix approach~~ **DONE** — tolerant fan-out resolver implemented + tested. **Action remaining: rebuild the api container** (`cd dashboard && docker compose up -d --build api`, after `security unlock-keychain`) to make it live, then re-run both videos to confirm infographics generate end-to-end.
 2. Fix gate-on-cancelled-dependency (P1) so empty gates never park.
-3. Map the transcript into `topic-relatedness` input (P1) so the format suggestion is real.
-4. De-duplicate gates (P1) so the review UI is usable.
+3. Map the transcript into `topic-relatedness` input (P1) so the format suggestion is real — **engine data-flow fix** (producers don't receive `input.upstream`; seed uses non-interpolated `{upstream.transcript}`). Deferred until live validation is possible.
+4. ~~De-duplicate gates~~ **DONE** (`7589a4c`) — non-destructive dashboard filter.
 5. Investigate runner socket flakiness + serial throughput (P1).
 6. (New) yt-dlp PO-token/caption fetch reliability — add cookies/PO-token provider so transcript fetch survives YouTube's anti-bot enforcement.
+
+### Fixes committed this session (all in `qone_corp-dashboard-refactor`, pending container rebuild to go live)
+| Commit | Fix | Validation |
+|---|---|---|
+| `ad10e87` | P0 tolerant fan-out resolver (envelope non-determinism) | 17/17 unit + real captured-data replay |
+| `ca24119` | P2 `forceReprocess` honored (dedup bypass) | unit (videoCheck) |
+| `7589a4c` | P1 gate dashboard filter (hide orphan gates) | live-DB query (471→14) |
+
+The api container still runs the old image — rebuild (`cd dashboard && docker compose up -d --build api`, keychain unlocked) to make all three live.
 
 ## Artifacts
 - Produced topics: `generated/ai-inspire-ui-test/*.json`
