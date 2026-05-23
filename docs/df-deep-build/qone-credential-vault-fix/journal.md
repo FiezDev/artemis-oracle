@@ -299,3 +299,59 @@ Start by fixing the docker rebuild (`docker compose up -d --build api --progress
 Worker daemon (`qone_corp/social-login/worker/server.ts`) needs to be running for the dashboard's `Test` button to work — start it manually with `bun run worker/server.ts` or set up a launchd plist (follow-up).
 
 **The credential vault really works now.** Mission accomplished on the core ask.
+
+---
+
+## 2026-05-23 — Continuation: Phase 5 slices 3-4 verified, slices 5-7 deferred
+
+Session continued after the initial wrap-up. The user said "keep doing this and you can be opinionated about this and decide what to do" — permission to push.
+
+**Opinionated calls this turn:**
+- Fix the docker rebuild FIRST (gates everything else Phase 5)
+- Skip parkAtGate + the advisory lock from slice 4 v1 (both are theater without deeper run-lifecycle integration; fail-the-step gives the operator a clearer signal anyway)
+- Drive slices 3 + 4 backend to a smoke-verified end-to-end proof, then check in
+
+**Docker rebuild fix (`c4b2a0c`):**
+Root cause: build context was `./api`, so `bun install` couldn't see the sibling `packages/shared-types/` that api/package.json references via `workspace:*`. Fix: context → `./` (dashboard workspace root), Dockerfile copies all workspace member manifests before `bun install`, then the source trees. Rebuilds clean; container now has the full `/app/api/src/orchestration/workflows/` subtree.
+
+**Slice 4 + bootstrap entry-point (`ee1e757`):**
+- Added migration `0052_workflow_nodes_allow_credential.sql` to extend the workflow_nodes_type_ref CHECK constraint with a 6th branch for `node_type='credential'`. Without this, INSERTs into workflow_nodes with the new type rejected with constraint violation.
+- Expanded `credential-node/handler.ts` with the preflight path: `preflightViaWorker(credentialId)` returns `{outcome, message}`; the handler branches into 5 cases (logged_in → proceed; needs_human / bad_credentials / unreachable / error → fail step with operator-actionable message).
+- Added a 3rd entry-point dispatch branch in `_step-engine-bootstrap.ts` for `credential` nodes. Previously the bootstrap only dispatched `process` and `subworkflow` at entry; a no-deps credential node would sit forever at `status='available'`.
+
+**End-to-end smoke (workflow `ac266ecc-b694-4e23-b22b-00c9cd49fdf3`):**
+- Created minimal workflow: trigger node + credential node (no deps; credentialId = qonecompany-fb's UUID)
+- preflight=false run → completed in <1s, `workflow_runs.variables.currentCredentialId` set correctly, step output `{credentialId, preflightApplied: false}`
+- preflight=true run → completed in ~3s (worker call latency), `preflightApplied: true`, FB warm session validated by the worker as `logged_in` and the credential node marked done
+
+The full chain that fired:
+```
+POST /api/v1/workflows/<id>/run
+  → triggerRunV2 → step-engine-bootstrap
+  → bootstrap dispatches credential node (entry-point, no deps)
+  → handler.dispatchCredentialNode(preflight=true)
+  → preflightViaWorker → fetch host.docker.internal:5510/from-vault
+  → worker spawns CLI → CLI uses warm cookies → validates session
+  → worker returns {status:'logged_in', ...}
+  → handler writes currentCredentialId to workflow_runs.variables
+  → handler marks step_run done
+  → engine recomputes run status → completed
+```
+
+**Slices 5-7 deferred to fresh session:**
+- CredentialPicker component
+- credential node card in workflow builder (`workflow-node-editor.tsx`)
+- pg_advisory_lock + crash-recovery sweep
+These need ~5h focused work; UI especially benefits from fresh context.
+
+**Commits landed this continuation:**
+- `c4b2a0c` — fix(docker): rebuild api image from workspace root
+- `ee1e757` — feat(api): Phase 5 slice 4 — credential node preflight + bootstrap dispatch
+
+**What you can do RIGHT NOW (no further code needed):**
+- Insert workflow_nodes rows with `node_type='credential'` + `variable_overrides='{"credentialId":"...","preflight":true}'` to add credential gates to any existing workflow. Downstream nodes can read `currentCredentialId` from their merged input.
+- Workflow runs that hit a `needs_human` credential preflight will FAIL with a clear actionable error message — re-warm via the extension, re-trigger the workflow.
+
+**Blockers remaining (all pre-existing, not from this session):**
+- `bun run db:migrate` still wedged on 0043 — migrations applied directly via psql each time. Worth fixing standalone.
+- Two known infra concerns documented earlier remain valid.
