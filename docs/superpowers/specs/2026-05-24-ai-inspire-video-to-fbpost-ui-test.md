@@ -166,11 +166,15 @@ Topics generated successfully before the infographic stage (exported to `generat
 ### Fixes committed this session (all in `qone_corp-dashboard-refactor`, pending container rebuild to go live)
 | Commit | Fix | Validation |
 |---|---|---|
-| `ad10e87` | P0 tolerant fan-out resolver (envelope non-determinism) | 17/17 unit + real captured-data replay |
-| `ca24119` | P2 `forceReprocess` honored (dedup bypass) | unit (videoCheck) |
+| `ad10e87` | P0 tolerant fan-out resolver (envelope non-determinism) | 17/17 unit + real captured-data replay + **live run** (see below) |
+| `ca24119` | P2 `forceReprocess` honored (dedup bypass) | unit (videoCheck) + live trigger |
 | `7589a4c` | P1 gate dashboard filter (hide orphan gates) | live-DB query (471→14) |
+| `0b911b2` | P1/#6 yt-dlp captions via android/web_safari/tv player clients | 5/5 unit + **live: fetched 48k-char transcript** that previously returned empty |
 
-The api container still runs the old image — rebuild (`cd dashboard && docker compose up -d --build api`, keychain unlocked) to make all three live.
+The api container still runs the old image — rebuild (`cd dashboard && docker compose up -d --build api`, keychain unlocked) to make all four live. A local patched API (`bun run src/index.ts` on :5501) was used to validate live this session.
+
+### P1 topic-relatedness — re-confirmed deeper (still deferred)
+With captions restored, a fresh live run still shows the topic-relatedness producer receiving `transcript = "{upstream.transcript}"` (21 chars) and **no `upstream` key at all** — i.e. the Format-Decision producer nodes execute against the *bootstrap-baked* input (`{...variables, ...nodeOverrides}`, `_step-engine-bootstrap.ts:91`), which never includes the predecessor's output. So N1's 48k-char transcript cannot reach N2 without an engine-level change to how producer-node input is assembled on advance. Broad blast radius (touches every producer step's input) → not shipped blind.
 
 ## Artifacts
 - Produced topics: `generated/ai-inspire-ui-test/*.json`
