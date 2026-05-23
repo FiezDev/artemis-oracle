@@ -9,7 +9,8 @@ Bring the qone_corp credential vault back to working order: fix the auth-mutatio
 - **Architecture:** added by df-deep-build-plan after design
 
 **Started:** 2026-05-23
-**Status:** planning
+**Closed:** 2026-05-23 (single-day session)
+**Status:** core scope complete (T1–T5, T7, T8, T9 done); Phase 5 partial (T10 slices 1–3); T6, T10 slice 4, T11 deferred to next session
 **Slug:** `qone-credential-vault-fix`
 **Scope:** Full breakdown — 8 vertical slices (T1–T8)
 **Owner:** Artemis (Fiez supervising)

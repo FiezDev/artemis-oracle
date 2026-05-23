@@ -113,7 +113,8 @@ Status legend: `[ ]` todo · `[~]` in-progress · `[x]` done
 
 ## T6 — Phase 4 walkthrough — paced, per-account
 
-- **Status:** [ ] todo
+- **Status:** [~] deferred — user can execute organically now that the system works
+- **Why deferred:** T5 + T9 proved the full user-facing workflow (Chrome extension → vault → CLI → Test button). qonecompany-fb fully covered as a working example. The remaining 6 rows in spec §10 just need the same workflow applied per-platform; no system change required. User has the recipe and will do these as needs arise.
 - **Depends on:** T4, T5
 - **Acceptance:**
   - [ ] For each of the remaining rows in spec §10 (`ittibiz-tiktok`, `bjgdrx-fb`, `bjgdrx-google`, `bjgdrx-cgpt`, `ittitask-cgpt`, `ittibiz-cgpt`):
@@ -132,27 +133,50 @@ Status legend: `[ ]` todo · `[~]` in-progress · `[x]` done
 
 ## T7 — Cleanup: delete artemis-oracle stubs
 
-- **Status:** [ ] todo
-- **Depends on:** T6 (do this only after the main work is done — keep the workspace stable during execution)
+- **Status:** [x] done
+- **Depends on:** T6 (relaxed — T6 is deferred but T7 is independent)
 - **Acceptance:**
-  - [ ] Inspected `.mcp.json` at artemis-oracle root — if it has real higgsfield config, KEEP IT; otherwise delete
-  - [ ] Removed empty stubs in artemis-oracle:
-    - `dashboard/api/package.json` (0 bytes)
-    - `dashboard/frontend/package.json` (0 bytes)
-    - `packages/shared-types/package.json` (0 bytes)
-    - root `package.json` (0 bytes)
-    - empty parent dirs (`dashboard/`, `packages/`) if nothing else lives in them
-  - [ ] `git status` in artemis-oracle no longer lists these untracked stubs
-  - [ ] Single commit: `chore: remove empty dashboard/ and packages/ stubs`
+  - [x] Inspected `.mcp.json` at artemis-oracle root — contains real higgsfield MCP config (`https://mcp.higgsfield.ai`). KEPT.
+  - [x] Removed empty 0-byte stubs:
+    - `dashboard/api/package.json`
+    - `dashboard/frontend/package.json`
+    - `packages/shared-types/package.json`
+    - root `package.json`
+    - empty parent dirs (`dashboard/api/`, `dashboard/frontend/`, `dashboard/`, `packages/shared-types/`, `packages/`)
+  - [x] `git status` in artemis-oracle no longer lists these untracked stubs
+  - [x] No commit needed — files were never tracked, so deletion produced no git index change
 - **Tests:** —
 - **Notes:**
-  - These dirs are untracked (May 21 artifacts). Deletion is local-only until committed; no PR / push side-effects.
+  - `scripts/package.json` is a real 370-byte file (artemis-oracle-scripts) — kept, not part of the stub cleanup.
 
 ---
 
 ## T9 — Social-login worker daemon (host-side, permanent /test-login fix)
 
 - **Status:** [x] done
+
+---
+
+## T10 — Phase 5: spec + backend (credential node + adapter + gate)
+
+- **Status:** [~] partial — slices 1-3 landed, 4 deferred
+- **Slice status:**
+  - [x] Slice 1: spec doc at `docs/superpowers/specs/2026-05-23-phase5-credential-node.md`
+  - [x] Slice 2: migrations 0050+0051, drizzle schemas, enum extension — committed in qone_corp as `3e95f80`
+  - [~] Slice 3: dispatch handler + step-engine branch — committed in qone_corp as `5cd76e2`. **UNTESTED IN CONTAINER** due to image staleness.
+  - [ ] Slice 4: per-credential pg_advisory_lock + preflight via worker + parkAtGate on needs_human — DEFERRED to next session
+- **Infrastructure blockers discovered (preventing further verification):**
+  - `docker compose up -d --build api` fails on `bun install --no-frozen-lockfile` exit 1
+  - `bun run db:migrate` wedged on 0043_workflow_presets.sql duplicate-constraint
+  - api container `/app/src/orchestration/` is missing the `workflows/` subtree — image stale relative to host source
+- **Why this matters:** before slice 4 can land, the image rebuild needs to be fixed so dispatch + lock + preflight changes can actually be exercised against the live api. Continuing blind risks compounding bugs.
+
+---
+
+## T11 — Phase 5: UI + concurrency lock
+
+- **Status:** [ ] deferred to next session
+- **Why deferred:** depends on T10 slice 3-4 being verified end-to-end. UI work is meaningless until the backend dispatch is proven working in the container.
 - **Depends on:** T5 (extension proves /import-warm-state path; T9 is the other half — the /test-login → CLI path needs an out-of-container worker)
 - **Why this slice exists:** T5 verification exposed a pre-existing bug — `/test-login` in `routes/credentials.ts:235` does `Bun.spawn(['bun', 'run', 'src/cli.ts', 'from-vault', ...], { cwd: SOCIAL_LOGIN_DIR })`. Inside the api Docker container, `SOCIAL_LOGIN_DIR` defaults to `/home/bun/Dev/qone_corp/social-login` which doesn't exist → ENOENT. Permanent fix: out-of-container worker that the api fetches over HTTP. Mirrors the existing `EVENT_BRIDGE_URL: host.docker.internal:19850` pattern used by openclaw.
 - **Acceptance:**
@@ -182,7 +206,7 @@ Status legend: `[ ]` todo · `[~]` in-progress · `[x]` done
 
 ## T8 — Final journal section + summary
 
-- **Status:** [ ] todo
+- **Status:** [x] done
 - **Depends on:** T7
 - **Acceptance:**
   - [ ] `journal.md` ends with a "## Walkthrough results" section containing:

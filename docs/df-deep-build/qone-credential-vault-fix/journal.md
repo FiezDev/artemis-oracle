@@ -190,3 +190,112 @@ Surprises:
 - The pre-commit hook ran `bun run gen:spec && bun run gen:types` again — no schema change this time either (the /test-login route signature stayed compatible).
 
 Next: T5 closes (extension proven), pull T6 (Phase 4 walkthrough) or jump to T7/T8 cleanup.
+
+---
+
+## 2026-05-23 — Phase 5 attempt (T10 slices 1-3) + close-out
+
+User requested full Phase 5 build (T10+T11, ~8-12h estimate). What landed:
+
+- **Slice 1 (spec doc):** `docs/superpowers/specs/2026-05-23-phase5-credential-node.md` — 15 sections, file:line references throughout, ~500 lines. Captures architecture (Login-as-process via `node_type='credential'`), data model (no schema migration for the node; one new lock-tracking table), advisory-lock design (mirrors `trigger-scheduler.ts:63-76`), runner adapter, UI plan, acceptance criteria, open questions.
+
+- **Slice 2 (foundations):** committed in qone_corp as `3e95f80`. Migrations `0050_workflow_run_credential_locks.sql` + `0051_processes_adapter_column.sql`, drizzle schema for the lock table, `adapter` column on processes (NULL = LLM default; 'social-login' = direct), 'credential' added to NodeBodySchema enum. Migrations applied directly via `psql -f` (bun migrator wedged on pre-existing 0043 drift — see below).
+
+- **Slice 3 partial (dispatch):** committed in qone_corp as `5cd76e2`. Created `credential-node/handler.ts` (dispatch + variable propagation, no lock yet, no preflight yet) and added the 5th branch in `_step-engine-advance.ts`. **Untested in container** because the api Docker image is stale (more on this below).
+
+**Why slice 4 + the rest of Phase 5 are deferred:**
+
+Discovered three pre-existing infrastructure blockers during slice 3:
+
+1. **api image is stale.** The running container's `/app/src/orchestration/` only contains `credentials/` — the entire `workflows/` orchestration subtree is missing. `docker cp`'d the new dispatch changes in, but they were silently dropped (no such directory). The /workflows API still answers 200 on read endpoints, but the runner code path isn't actually in the container.
+2. **`docker compose up -d --build api` fails** on `bun install --no-frozen-lockfile` exit 1. BuildKit output is truncated; root cause needs `--progress=plain`.
+3. **`bun run db:migrate` is wedged** on 0043_workflow_presets.sql — constraint already exists in DB, migration tracker says 0043 unapplied. Blocks future migration runs.
+
+These are pre-existing — not caused by the credential vault work. But until they're fixed, Phase 5 verification can't proceed in this container.
+
+**Closing the session at this state:**
+
+User agreed to commit what we have, defer slice 4 + UI to a fresh session, close out with T7 (stub cleanup) + T8 (this entry).
+
+---
+
+## Walkthrough results — credential vault status as of close of session
+
+### Core ask delivered
+
+The original ask: **"research qone dashboard and fix credential feature to really work spawn new agent as need"**. Delivered:
+
+| Behavior | Status | Evidence |
+|---|---|---|
+| Dashboard UI: create / list / delete credential | ✓ working | Real-browser smoke via agent-browser drove `+ New Credential` → row in DB → Delete → row gone |
+| Backend hybrid auth (X-Agent-ID admin OR X-Service-Token) | ✓ working | `cffdc73` — unit tests + route tests + manual curl proof on 5 mutation routes (POST/, DELETE, PATCH, /:id/import-warm-state, /:id/test-login) |
+| Chrome extension → vault import-warm-state | ✓ working | qonecompany-fb's `warm_state_at` updated to today via popup capture; verified in DB |
+| CLI: `from-vault` returns logged_in headless | ✓ working | `qonecompany-fb` smoke: exit 0, `finalUrl=web.facebook.com/home.php`, message `Existing session valid` |
+| Vault unreachable handling (§14.12) | ✓ working | Stopped api container, re-ran `from-vault` → stderr `vault unreachable: Unable to connect.`, exit 3 |
+| UI Test button (test-login) | ✓ working | Real-browser click via agent-browser → api Docker → fetch → worker host → cloakbrowser → vault → DB updated (last_used_at=today, last_status=logged_in) |
+
+### Architectural pieces shipped
+
+1. **Hybrid auth helper** in `dashboard/api/src/middleware/auth.ts`:
+   - exported `ADMIN_AGENTS` const (drift-protected, starts at `['artemis']`)
+   - `isAdminAgent(c)` predicate
+   - `requireAdminOrService(c)` guard (returns null on pass, 403 response on deny)
+   - Applied to all 5 credential mutation routes; `/use` + `/status` remain service-token-only
+2. **Social-login worker daemon** at `qone_corp/social-login/worker/server.ts`:
+   - Listens on `0.0.0.0:5510`, single endpoint `POST /from-vault`
+   - HMAC via X-Service-Token (timing-safe-equal)
+   - Spawns the existing `from-vault` CLI on the host with the right env (vault URL, service token)
+   - api container reaches it via `host.docker.internal:5510`
+   - api's `/test-login` route refactored from 80 lines of inline `Bun.spawn` to ~30 lines of `fetch`
+   - Mirrors the existing openclaw event-bridge pattern (`EVENT_BRIDGE_URL: host.docker.internal:19850`)
+3. **Phase 5 design** in `docs/superpowers/specs/2026-05-23-phase5-credential-node.md`:
+   - Full architecture for `node_type='credential'` (Login-as-process pattern)
+   - Concrete acceptance criteria, open questions, file-level deliverables
+   - Ready for next-session implementation against a contract
+
+### Row status table (spec §10)
+
+| Row | Platform | Status as of close | Notes |
+|---|---|---|---|
+| qonecompany-fb | facebook | 🟢 logged_in | Warm state refreshed via extension today (2026-05-23 13:12); UI Test button verified at 13:59 |
+| bjgdrx-cgpt | openai_web | 🔴 error (no warm state) | User can warm via extension when logged into chatgpt.com as Bjgdrx in real Chrome |
+| ittibiz-cgpt | openai_web | 🔴 error (no warm state) | Same workflow as above for ittipolbiz account |
+| ittitask-cgpt | openai_web | (deleted) | Was in DB at session start; deleted by user during exploration |
+| ittibiz-tiktok | tiktok | (deleted) | Same |
+| qoneidol-tiktok | tiktok | (deleted) | Same |
+| (no bjgdrx-google) | google | (never existed) | Spec §10 lists it but the row was never created |
+
+The deleted/missing rows are not a regression; the user can re-create them via `+ New Credential` and warm via the extension at their leisure. The workflow is proven.
+
+### Deferred work (next session)
+
+- **T6 — Phase 4 walkthrough** (warm-up remaining rows): user-driven, no system change needed; will execute organically as use-cases arise
+- **Phase 5 slice 3 verification** (test the dispatch handler against a real workflow run; needs container rebuild first)
+- **Phase 5 slice 4** (advisory lock + preflight via worker + parkAtGate on needs_human)
+- **Phase 5 slices 5-7** (CredentialPicker UI + credential node card in workflow builder + concurrency hardening)
+
+### Infrastructure blockers to fix first (pre-existing, not caused by this work)
+
+1. `docker compose up -d --build api` fails on `bun install --no-frozen-lockfile` — diagnose with `--progress=plain`
+2. `bun run db:migrate` wedged on 0043_workflow_presets.sql duplicate-constraint — needs a manual journal fixup or migration re-baseline
+3. api image is stale relative to host source — once rebuild works, the workflows orchestration subtree will land in the container and Phase 5 dispatch can be smoke-tested
+
+### Commits landed this session
+
+In `qone_corp/`:
+- `cffdc73` — fix(api): allow X-Agent-ID admin OR X-Service-Token on credential mutations (incl. test-login)
+- `29fbb41` — feat(social-login): host-side worker daemon for out-of-container /test-login execution
+- `3e95f80` — feat(api): Phase 5 foundations — credential-lock table + processes.adapter + 'credential' node enum
+- `5cd76e2` — feat(api): Phase 5 slice 3 partial — credential node dispatch (untested in container)
+
+In `artemis-oracle/`:
+- (this session): docs commit with the full doc-pack + Phase 5 spec
+- (T8 close, this commit): final journal updates
+
+### Suggested next-session opening move
+
+Start by fixing the docker rebuild (`docker compose up -d --build api --progress=plain` to see the bun-install failure). Once the image rebuild works, the Phase 5 backend slices 3+ can be verified end-to-end. Then move through slices 4-7 with the spec doc as the contract.
+
+Worker daemon (`qone_corp/social-login/worker/server.ts`) needs to be running for the dashboard's `Test` button to work — start it manually with `bun run worker/server.ts` or set up a launchd plist (follow-up).
+
+**The credential vault really works now.** Mission accomplished on the core ask.
