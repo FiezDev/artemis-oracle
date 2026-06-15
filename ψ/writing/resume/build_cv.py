@@ -110,6 +110,7 @@ EXPERIENCE = [
     {
         "company": "NestiFly", "role": "Assistant Manager / Full-Stack Developer",
         "dates": "September 2022 – May 2024 · Bangkok",
+        "page_break": True,
         "lead": "",
         "bullets": [
             "Built the NestiFly CRM/API (Darkphoenix / Blackbird) end-to-end — architecture, database schema, "
@@ -322,6 +323,7 @@ h2 { font-size:%(h2)spt; text-transform:uppercase; letter-spacing:1.4px; color:#
 .skill, .actline, .summary, .lang { margin:2px 0; }
 ul { margin:%(ulm)spx 0 %(ulb)spx; padding-left:16px; }
 li { margin:%(lim)spx 0; color:#333; }
+.pbreak { page-break-before: always; break-before: page; }
 """
 
 def render_html(onepage=False, thai=False):
@@ -350,7 +352,8 @@ def render_html(onepage=False, thai=False):
 
     P.append("<h2>Professional Experience</h2>")
     for e in EXPERIENCE:
-        P.append(f"<div class='exphead'><span class='role'>{esc(e['company'])} — {esc(e['role'])}</span>"
+        cls = "exphead pbreak" if (not onepage and e.get("page_break")) else "exphead"
+        P.append(f"<div class='{cls}'><span class='role'>{esc(e['company'])} — {esc(e['role'])}</span>"
                  f"<span class='dates'>{esc(e['dates'])}</span></div>")
         if onepage:
             P.append("<ul>")
@@ -449,6 +452,8 @@ def render_docx(path, onepage=False, thai=False):
         body(v, bold_prefix=f"{k}: ")
     section("Professional Experience")
     for e in EXPERIENCE:
+        if not onepage and e.get("page_break"):
+            doc.add_page_break()
         p = doc.add_paragraph(); p.paragraph_format.space_before = Pt(5); p.paragraph_format.space_after = Pt(0)
         r = p.add_run(f"{e['company']} — {e['role']}"); r.bold = True; r.font.color.rgb = INK
         p_run(e["dates"], 9, color=GRY, after=1)
