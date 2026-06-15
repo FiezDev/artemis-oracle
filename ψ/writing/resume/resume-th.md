@@ -4,6 +4,7 @@
 
 Bang Phli, Samut Prakan, Thailand · +66 91 721 0274 · itti.task@gmail.com  
 GitHub: github.com/FiezDev · LinkedIn: linkedin.com/in/fiezdev · Portfolio: fiez.dev/portfolio  
+Date of Birth: 11 November 1983 · Nationality: Thai  
 
 ---
 
